@@ -9,10 +9,11 @@ import zipfile
 from pathlib import Path
 from datetime import datetime
 from tornado.httpclient import HTTPError
+
 from qa4sm_api.globals import (
-    QA4SM_ACCESS,
+    QA4SM_DOTRC_PATH,
     ValidationRunNotFoundError,
-    TOKEN_WARNING, TOKEN_ERROR
+    _load_dotrc
 )
 
 
@@ -43,6 +44,70 @@ class Response:
             return df.iloc[0, :]  # dtype: pd.Series
         else:
             return df  # dtype: pd.DataFrame
+
+
+class Access:
+    def __init__(self, access):
+        """
+        Initialize the Access class with credentials to the API.
+        """
+        self.access = access
+
+    def __getitem__(self, item):
+        return self.access[item]
+
+    @classmethod
+    def from_available(cls):
+        # Try first if the environment variables are set
+        try:
+            return cls.from_env()
+        except EnvironmentError:
+            return cls.from_dotrcfile()
+
+    @classmethod
+    def from_env(cls):
+        try:
+            instance = os.environ["QA4SM_INSTANCE"]
+        except KeyError:
+            raise EnvironmentError("QA4SM_INSTANCE not found in environment "
+                                   "variables.")
+        try:
+            token = os.environ["QA4SM_TOKEN"]
+        except KeyError:
+            raise EnvironmentError("QA4SM_TOKEN not found in environment "
+                                   "variables.")
+        access = {instance: token}
+
+        return cls(access)
+
+    @classmethod
+    def from_dotrcfile(cls, path=QA4SM_DOTRC_PATH):
+        """
+        Load access from dotrc file.
+
+        Parameters
+        ----------
+        path: str
+            Path to the dotrc file
+        """
+        config = _load_dotrc(path)
+        return cls(config)
+
+    @classmethod
+    def with_token(cls, instance, token):
+        """
+        Load access without token (limited access)
+        """
+        return cls({instance: {'token': token}})
+
+    @classmethod
+    def without_token(cls, instance):
+        """
+        Load access without token (limited access)
+        """
+        warnings.warn(f"No token was found {instance}, continue as anonymous "
+                      f"user (with limited access)")
+        return cls({instance: {'token': None}})
 
 
 class Session:
@@ -81,20 +146,16 @@ class Session:
         self.response = None
 
         if token == "auto":
-            if QA4SM_ACCESS is None:
-                token = 'none'
-                warnings.warn(TOKEN_WARNING)
+            self.access = Access.from_available()
         elif token == "file":
-            if QA4SM_ACCESS is None:
-                raise TOKEN_ERROR
-            else:
-                token = QA4SM_ACCESS[self.instance]['token']
-        elif token.lower() == 'none':
-            token = None
-        else:  # token direct
-            token = token
+            self.access = Access.from_dotrcfile()
+        elif token.lower() == "none":
+            self.access = Access.without_token(self.instance)
+        else:
+            self.access = Access.with_token(self.instance, token)
 
         self.user = None
+        token = self.access[instance]['token']
         if token is not None:
             _ = self.login_with_token(token)
         else:
@@ -122,6 +183,8 @@ class Session:
             print(f"Hi, {username}! You're successfully logged "
                   f"in at {self.api_url}!")
         self.user = username
+        self.access = Access({self.instance:
+                                  {'token': token, 'username': self.user}})
         return 200
 
     def login_with_credentials(self, username=None, password=None,
@@ -138,12 +201,17 @@ class Session:
             Password for the chosen QA4SM instance.
         quiet: bool, optional (default: False)
             Suppress welcome message.
+
+        Returns
+        -------
+        token: str
+            user login token
         """
         data = {'username': username, 'password': password}
         response = self.post(self.url("auth/login"), data=data)
         token = response.pandas['auth_token']
         self.login_with_token(token, quiet=quiet)
-
+        return token
 
     def _send_request(self,
                       url,
@@ -597,9 +665,11 @@ if __name__ == '__main__':
     QA4SM_API_TOKEN = "2b37740a1f6733c9cfc2e1e105abe974ff8c4204"
     username = "preimesberger"
     password = "i7j.r308"
-    # conn.login(username, password)
-    qa4sm = Connection(QA4SM_IP_OR_URL, token='file')
     qa4sm = Connection(QA4SM_IP_OR_URL, QA4SM_API_TOKEN, protocol='https')
+
+    qa4sm = Connection(QA4SM_IP_OR_URL, token='file')
+    qa4sm.login(username, password)
+
     qa4sm.session
     qa4sm.download_configuration("332f3873-a5bc-4df2-b8b2-0e025096f83e",
                                  "/tmp")

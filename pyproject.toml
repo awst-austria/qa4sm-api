@@ -43,6 +43,7 @@ docs = [
 ]
 
 [project.scripts]
+qa4sm = "qa4sm_api.cli:qa4sm"
  # ccism_reshuffle = "esa_cci_sm.reshuffle:run"
 
 [tool.setuptools]

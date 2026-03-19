@@ -3,6 +3,13 @@ import os
 import  warnings
 import configparser
 
+if "QA4SM_DOTRC" in os.environ:
+    QA4SM_DOTRC_PATH = Path(os.environ["QA4SM_DOTRC"])
+else:
+    QA4SM_DOTRC_PATH = Path.home() / ".qa4smapirc"
+
+DEFAULT_INSTANCE = "qa4sm.eu"
+KNOWN_INSTANCES = ["qa4sm.eu", "test.qa4sm.eu", "test2.qa4sm.eu", "0.0.0.0:8000"]
 
 class ValidationRunNotFoundError(ValueError):
 
@@ -18,16 +25,39 @@ class ValidationRunError(Exception):
         self.message = message
         super().__init__(self.message)
 
-def load_dotrc(path=Path.home(), name='.qa4smapirc') -> dict:
+
+def _write_dotrc(config: dict, path=QA4SM_DOTRC_PATH):
+    """
+    Write credentials to a .qa4smapirc file.
+
+    Parameters
+    ----------
+    config : dict
+        Credentials keyed by hostname, e.g.:
+        {
+            "qa4sm.eu":      {"token": "...", "username": "..."},
+            "test.qa4sm.eu": {"token": "..."},
+        }
+    path : str or Path, optional
+        Path to the .qa4smapirc file
+    """
+
+    with open(path, 'w') as f:
+        for host, fields in config.items():
+            f.write(f'[{host}]\n')
+            for key, value in fields.items():
+                f.write(f'{key}: {value}\n')
+            f.write('\n')
+
+
+def _load_dotrc(path=QA4SM_DOTRC_PATH):
     """
     Read credentials from a .qa4smapirc file.
 
     Parameters
     ----------
-    path : str or Path, optional (default: Path.home())
-        Directory that contains the dotrc file.
-    name : str, optional (default: ".qa4smapirc")
-        Name of the dotrc file to load.
+    path : str or Path, optional
+        Path to the .qa4smapirc file
 
     Returns
     -------
@@ -40,11 +70,9 @@ def load_dotrc(path=Path.home(), name='.qa4smapirc') -> dict:
         Sections named 'default' or 'qa4sm' both map to 'qa4sm.eu'.
         All other section names (e.g. 'test', 'test2') map to '<name>.qa4sm.eu'.
     """
-    path_dotrc = Path(path) / name
-
-    if not path_dotrc.exists():
+    if not path.exists():
         raise FileNotFoundError(
-            f'{name} file not found at {path}. '
+            f'QA4SM credentials file not found at {path}. '
             f'Please check https://qa4sm.eu/ui/public-api'
         )
 
@@ -55,7 +83,7 @@ def load_dotrc(path=Path.home(), name='.qa4smapirc') -> dict:
             else section
 
     parser = configparser.ConfigParser()
-    parser.read(path_dotrc)
+    parser.read(path)
 
     config = {}
 
@@ -69,33 +97,19 @@ def load_dotrc(path=Path.home(), name='.qa4smapirc') -> dict:
 
     return config
 
-#######################################
 
-# QA4SM_DOTC contains the path to the API dotrc file
-if "QA4SM_DOTRC" in os.environ:
-    QA4SM_DOTRC = Path(os.environ["QA4SM_DOTRC"])
-    path = QA4SM_DOTRC.parent
-    name = QA4SM_DOTRC.name
-else:
-    path, name = Path.home(), ".qa4smapirc"
-    QA4SM_DOTRC = Path(path) / name
+def _connect_with_credentials(instance: str, username: str, password: str) -> dict:
+    """
+    Open a Session to the given instance, authenticate with username/password,
+    and return the auth token.
+    """
+    # Import here so the CLI works even if the rest of the package isn't
+    # fully installed — errors surface only when login is actually attempted.
+    from qa4sm_api.client_api import Session
 
-# QA4SM_TOKEN contains the token loaded from the dotrc file or None
-if ("QA4SM_INSTANCE" in os.environ) and ("QA4SM_TOKEN" in os.environ):
-    QA4SM_ACCESS = {os.environ["QA4SM_INSTANCE"]: os.environ["QA4SM_TOKEN"]}
-else:
-    try:
-        QA4SM_ACCESS = load_dotrc(path, name)
-    except FileNotFoundError:
-        QA4SM_ACCESS = None
-
-TOKEN_WARNING = (
-    f"Could not derive QA4SM token from {name} file in {path}. "
-    f"Continue without token (limited API access)."
-)
-
-TOKEN_ERROR = ConnectionError(
-    "No valid token provided. Please check the docs. Provide a valid token, "
-    "set the QA4SM_TOKEN environment variable, or create a .qa4smapirc file "
-    "with your token."
-)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        session = Session(instance=instance, token="none")
+        session.login_with_credentials(username=username, password=password)
+        access = session.access.access
+    return access

@@ -5,3 +5,7 @@
 
 The following API requests could make sense
 - Get current qa4sm version
+
+
+- why is variable not returned for a version?
+https://test.qa4sm.eu/api/dataset-version/1

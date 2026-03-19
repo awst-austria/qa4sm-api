@@ -4,8 +4,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration
-from qa4sm_api.globals import QA4SM_ACCESS
+from qa4sm_api.client_api import Access
 
+try:
+    QA4SM_ACCESS = Access.from_available().access
+except:
+    QA4SM_ACCESS = None
 
 class TestResponse(unittest.TestCase):
     re = [{'username': 'testuser', 'email': 'test.user@test.com',

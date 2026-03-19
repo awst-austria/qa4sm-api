@@ -39,7 +39,8 @@ qa4sm-api
 
 Environment variables
 
-- QA4SM_DOTRC_PATH: Path to the dotrc file that contains the API URL and token.
+- QA4SM_DOTRC: Path to the dotrc file that contains the API URL and token. Otherwise HOME/.qa4smapirc is used.
+
 
 
 A longer description of your project goes here...
