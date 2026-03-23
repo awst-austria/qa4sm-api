@@ -1,0 +1,133 @@
+# This workflow will install Python dependencies and run tests on
+# windows and linux systems with a variety of Python versions
+
+# For more information see:
+# https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Automated Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # daily
+
+jobs:
+  build:
+    name: py${{ matrix.python-version }}@${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.13']
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+          fetch-depth: 0
+          lfs: true
+      - name: Fetch tags
+        run: git fetch --tags --force
+      - name: Checkout LFS objects
+        run: git lfs checkout
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+          channel-priority: flexible
+          activate-environment: qa4sm_api
+          auto-activate-base: false
+      - name: Print environment infos
+        shell: bash -l {0}
+        run: |
+          conda info -a
+          conda list
+          pip list
+          which pip
+          which python
+      - name: Install dependencies and package
+        shell: bash -l {0}
+        run: |
+          pip install -e .[testing]
+      - name: Run all tests
+        shell: bash -l {0}
+        run: |
+          pytest
+      - name: Export Environment
+        shell: bash -l {0}
+        run: |
+          mkdir -p artifacts
+          filename=env_py${{ matrix.python-version }}_${{ matrix.os }}.yml
+          conda env export --no-builds | grep -v "prefix" > artifacts/$filename
+      - name: Create wheel and dist package
+        shell: bash -l {0}
+        run: |
+          if [ ${{ matrix.os }} == "windows-latest" ]
+          then
+            # build wheel on windows
+            python -m build --wheel --outdir artifacts/dist
+          else
+            # build sdist on linux/mac
+            python -m build --sdist --outdir artifacts/dist
+          fi
+          ls artifacts/dist
+          twine check artifacts/dist/*
+      - name: Upload Coverage
+        shell: bash -l {0}
+        continue-on-error: true
+        run: |
+          pip install coveralls && coveralls --service=github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
+          COVERALLS_PARALLEL: true
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Artifacts-py${{ matrix.python-version }}-${{ matrix.os }}
+          path: artifacts/*
+
+  publish-coverage:
+    name: Submit Coveralls 👚
+    needs: build
+    runs-on: ubuntu-latest
+    container: python:3-slim
+    steps:
+      - name: Finished
+        run: |
+          pip3 install --upgrade coveralls && coveralls --service=github --finish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi-package:
+    name: Publish PyPI 🚀
+    # Will only trigger when Tests have passed on release/tag from the TUW-GEO repository
+    if: |
+      startsWith(github.ref, 'refs/tags/v') &&
+      startsWith(github.repository, 'awst-austria')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print environment variables
+        run: |
+          echo "GITHUB_REF = $GITHUB_REF"
+          echo "GITHUB_REPOSITORY = $GITHUB_REPOSITORY"
+      - name: Download Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: Artifacts
+          pattern: Artifacts-*
+          merge-multiple: true
+      - name: Display downloaded files
+        run: ls -aR
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip_existing: true
+          verbose: true
+          verify_metadata: true
+          packages_dir: Artifacts/dist/
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }} # this needs to be uploaded to github actions secrets
