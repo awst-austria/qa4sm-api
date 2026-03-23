@@ -7,42 +7,7 @@ from qa4sm_api.globals import (_connect_with_credentials,
                                DEFAULT_INSTANCE)
 from qa4sm_api.client_api import Connection
 
-def login(instance=DEFAULT_INSTANCE):
-    """
-    Login to instance via username and password. Retrieve API token and store
-    it in ~/.qa4smapirc for future use.
-    """
-    click.echo(f"Logging in to: {instance}")
 
-    # Prompt for credentials (password input is hidden)
-    username = click.prompt("Username")
-    password = click.prompt("Password", hide_input=True)
-
-    # Retrieve token from the remote instance
-    try:
-        cred_access = _connect_with_credentials(instance, username, password)
-    except Exception as exc:
-        raise click.ClickException(f"Login failed: {exc}") from exc
-
-    if os.path.isfile(QA4SM_DOTRC_PATH):
-        access = _load_dotrc(QA4SM_DOTRC_PATH)
-        access[instance]['token'] = cred_access[instance]['token']
-        access[instance]['username'] = username
-        action = "Added"
-    else:
-        access = dict()
-        access[instance] = {'token': cred_access[instance]['token'],
-                            'username': username}
-        action = "Updated"
-
-    _write_dotrc(access, QA4SM_DOTRC_PATH)
-
-    click.echo(
-        click.style(
-            f"✓ {action} token for [{instance}] in {QA4SM_DOTRC_PATH}",
-            fg="green",
-        )
-    )
 
 
 def list_datasets(instance=DEFAULT_INSTANCE):

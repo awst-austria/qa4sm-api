@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import pandas as pd
 import pytest
-from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration
+from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration, ValidationInstanceError
 from qa4sm_api.client_api import Access
 
 try:
@@ -147,7 +147,12 @@ class TestConnectionWithToken(unittest.TestCase):
         assert user['username'] == self.con.session.user
 
 
+def test_unknown_instance():
+    with pytest.raises(ValidationInstanceError):
+        Session("unknown_instance.com")
+
 if __name__ == '__main__':
-    connection = TestConnectionWithToken()
-    connection.setUp()
-    connection.test_url()
+    test_unknown_instance()
+    #connection = TestConnectionWithToken()
+    #connection.setUp()
+    #connection.test_url()

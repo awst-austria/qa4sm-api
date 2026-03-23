@@ -13,6 +13,7 @@ from tornado.httpclient import HTTPError
 from qa4sm_api.globals import (
     QA4SM_DOTRC_PATH,
     ValidationRunNotFoundError,
+    ValidationInstanceError,
     _load_dotrc
 )
 
@@ -155,12 +156,16 @@ class Session:
             self.access = Access.with_token(self.instance, token)
 
         self.user = None
-        token = self.access[instance]['token']
+        if instance not in list(self.access.access.keys()):
+            raise ValidationInstanceError(f"Unknown instance {instance}. "
+                                          f"Please add it to your .qa4smapirc file.")
+        else:
+            token = self.access[instance]['token']
         if token is not None:
             _ = self.login_with_token(token)
         else:
             warnings.warn("No token was passed, limited API access. "
-                          "Only public API calls will work.")
+                          "Only public API calls are possible.")
 
     def url(self, *args) -> str:
         # Join URL parts
@@ -266,6 +271,10 @@ class ValidationConfiguration:
 
     def __eq__(self, other):
         return self.data == other.data
+
+    @property
+    def empty(self):
+        return len(self.data) == 0
 
     def dump(self, path):
         """

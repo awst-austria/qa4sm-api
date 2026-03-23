@@ -26,6 +26,12 @@ class ValidationRunError(Exception):
         super().__init__(self.message)
 
 
+class ValidationInstanceError(KeyError):
+
+    def __init__(self, message="Unknown validation instance"):
+        self.message = message
+        super().__init__(self.message)
+
 def _write_dotrc(config: dict, path=QA4SM_DOTRC_PATH):
     """
     Write credentials to a .qa4smapirc file.
@@ -70,6 +76,7 @@ def _load_dotrc(path=QA4SM_DOTRC_PATH):
         Sections named 'default' or 'qa4sm' both map to 'qa4sm.eu'.
         All other section names (e.g. 'test', 'test2') map to '<name>.qa4sm.eu'.
     """
+    path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
             f'QA4SM credentials file not found at {path}. '
