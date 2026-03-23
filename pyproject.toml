@@ -24,7 +24,8 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "pandas",
-    "click"
+    "click",
+    "requests",
 ]
 dynamic = ["version"]
 
@@ -44,7 +45,6 @@ docs = [
 
 [project.scripts]
 qa4sm = "qa4sm_api.cli:cli"
- # ccism_reshuffle = "esa_cci_sm.reshuffle:run"
 
 [tool.setuptools]
 include-package-data = true
