@@ -65,7 +65,8 @@ class Access:
         try:
             return cls.from_env()
         except EnvironmentError:
-            return cls.from_dotrcfile()
+            cls.from_dotrcfile()
+
 
     @classmethod
     def from_env(cls):

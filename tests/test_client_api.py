@@ -3,10 +3,8 @@ import unittest
 from pathlib import Path
 import pandas as pd
 import pytest
-import json
 from unittest.mock import Mock, MagicMock, patch
-from io import BytesIO
-import zipfile as zf
+import requests
 from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration, ValidationInstanceError
 from qa4sm_api.globals import ValidationRunNotFoundError
 from qa4sm_api.client_api import Access
@@ -257,8 +255,10 @@ class TestErrorCases(unittest.TestCase):
 
 
 def test_unknown_instance():
-    with pytest.raises(ValidationInstanceError):
-        Session("unknown_instance.com")
+    with pytest.warns(UserWarning):
+        conn = Connection("unknown_instance.com", token="none")
+    with pytest.raises(requests.exceptions.ConnectionError):
+        conn.datasets()
 
 if __name__ == '__main__':
     test_unknown_instance()
