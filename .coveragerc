@@ -2,7 +2,7 @@
 [run]
 branch = True
 source = qa4sm_api
-data_file = /tmp/{env:USER}/.coverage
+data_file = .coverage
 omit =
     */qa4sm_api/cli.py
     qa4sm_api/cli.py
