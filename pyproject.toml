@@ -32,7 +32,7 @@ dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/awst-austria/qa4sm-api"
-Documentation = "https://qa4sm-eu.readthedocs.io"
+Documentation = "https://awst-austria.github.io/qa4sm-api"
 
 [project.optional-dependencies]
 testing = [
