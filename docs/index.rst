@@ -6,13 +6,14 @@ Contents
 ========
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
-   Overview <readme>
-   API Usage <pages/basics>
-   License <license>
-   Changelog <changelog>
-   Module Reference <api/modules>
+    Overview <readme>
+    API Usage <pages/basics>
+    Command Line Interface <pages/cli>
+    License <license>
+    Changelog <changelog>
+    Module Reference <api/modules>
 
 
 Indices and tables

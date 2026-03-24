@@ -22,6 +22,5 @@ build:
     python: "3.11"
 
 python:
-  install:
-    - requirements: docs/requirements.txt
-    - {path: ., method: pip}
+  install:  # call pip install .[docs] for docs requirements
+    - {path: ., method: pip, extra_requirements: [docs]}

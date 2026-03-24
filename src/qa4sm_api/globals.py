@@ -32,6 +32,14 @@ class ValidationInstanceError(KeyError):
         self.message = message
         super().__init__(self.message)
 
+
+class AuthenticationError(ValueError):
+
+    def __init__(self, message="No API token is available for this user. "
+                               "Please generate one."):
+        self.message = message
+        super().__init__(self.message)
+
 def _write_dotrc(config: dict, path=QA4SM_DOTRC_PATH):
     """
     Write credentials to a .qa4smapirc file.
@@ -117,6 +125,6 @@ def _connect_with_credentials(instance: str, username: str, password: str) -> di
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         session = Session(instance=instance, token="none")
-        session.login_with_credentials(username=username, password=password)
+        _ = session.login_with_credentials(username=username, password=password)
         access = session.access.access
     return access

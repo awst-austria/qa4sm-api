@@ -26,12 +26,13 @@ dependencies = [
     "pandas",
     "click",
     "requests",
+    "tornado"
 ]
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/pyscaffold/pyscaffold/"
-Documentation = "https://pyscaffold.org/"
+Homepage = "https://github.com/awst-austria/qa4sm-api"
+Documentation = "https://qa4sm-eu.readthedocs.io"
 
 [project.optional-dependencies]
 testing = [
@@ -40,7 +41,9 @@ testing = [
     "coverage",
 ]
 docs = [
+    "sphinx>=3.2.1",
     "sphinx_rtd_theme",
+    "myst-parser>=0.18.1",
 ]
 
 [project.scripts]

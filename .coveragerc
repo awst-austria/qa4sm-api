@@ -2,7 +2,11 @@
 [run]
 branch = True
 source = qa4sm_api
-# omit = bad_file.py
+data_file = /tmp/{env:USER}/.coverage
+omit =
+    */qa4sm_api/cli.py
+    qa4sm_api/cli.py
+    */tests/*
 
 [paths]
 source =
@@ -10,6 +14,8 @@ source =
     */site-packages/
 
 [report]
+precision = 2
+
 # Regexes for lines to exclude from consideration
 exclude_lines =
     # Have to re-enable the standard pragma
@@ -25,4 +31,4 @@ exclude_lines =
 
     # Don't complain if non-runnable code isn't run:
     if 0:
-    if __name__ == .__main__.:
+    if __name__ == .__main__::

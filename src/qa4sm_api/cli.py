@@ -1,21 +1,12 @@
-from plistlib import loads
 import os
 import click
 from importlib.metadata import version
 
-from qa4sm_api.commands import list_datasets, list_versions
 from qa4sm_api.globals import (
     DEFAULT_INSTANCE, KNOWN_INSTANCES, QA4SM_DOTRC_PATH,
     _connect_with_credentials, _write_dotrc, _load_dotrc
 )
 from qa4sm_api.client_api import Connection
-
-"""
-qa4sm setup --instance INSTANCE                        |   to set up .qa4smapirc
-qa4sm validate CONFIG --instance INSTANCE              |   to start a validation run
-qa4sm download config RUNID PATH --instance INSTANCE   |   to download a config file
-qa4sm download results RUNID PATH --instance INSTANCE  |   to download all results for a run
-"""
 
 
 instance_option = click.option(
@@ -33,6 +24,15 @@ instance_option = click.option(
 def cli():
     pass
 
+
+@cli.group(short_help="API SETUP COMMANDS, see `qa4sm api --help`.")
+def api():
+    """
+    API setup commands
+    """
+    pass
+
+
 @cli.group(short_help="DOWNLOAD COMMANDS, see `qa4sm download --help`.")
 def download():
     """
@@ -41,7 +41,7 @@ def download():
     pass
 
 
-def _setup(instance=DEFAULT_INSTANCE):
+def setup_api(instance=DEFAULT_INSTANCE):
     """
     Login to instance via username and password. Retrieve API token and store
     it in ~/.qa4smapirc for future use.
@@ -60,6 +60,8 @@ def _setup(instance=DEFAULT_INSTANCE):
 
     if os.path.isfile(QA4SM_DOTRC_PATH):
         access = _load_dotrc(QA4SM_DOTRC_PATH)
+        if instance not in access.keys():
+            access[instance] = dict()
         access[instance]['token'] = cred_access[instance]['token']
         access[instance]['username'] = username
         action = "Added"
@@ -79,7 +81,7 @@ def _setup(instance=DEFAULT_INSTANCE):
     )
 
 
-@cli.command("setup",
+@api.command("setup",
              short_help="Add token to `.qa4smapirc` file.")
 @instance_option
 def cli_setup(instance: str) -> None:
@@ -87,8 +89,25 @@ def cli_setup(instance: str) -> None:
     Authenticate with a QA4SM instance using your username and password
     to retrieve and store a token for the chosen instance )in ~/.qa4smapirc.
     """
-    _setup(instance)
+    setup_api(instance)
 
+
+@api.command("check",
+             short_help="Check whether you can access an instance with "
+                        "the stored token.")
+@instance_option
+def cli_check(instance: str) -> None:
+    """
+    Authenticate with a QA4SM instance using your username and password
+    to retrieve and store a token for the chosen instance )in ~/.qa4smapirc.
+    """
+    qa4sm = Connection(instance, token='file')
+    user = qa4sm.session.user
+    if user is not None:
+        click.echo(f"Success, you can now send API commands to {instance}!")
+    else:
+        click.echo("Failed! Please make sure you have configured your "
+                   ".qa4smapirc file correctly.")
 
 @cli.command(
     "validate",
@@ -198,5 +217,4 @@ def cli_download_results(run_id: str, out_path: str, instance: str) -> None:
 
 
 if __name__ == "__main__":
-    cli_download_results("e0479d92-ff66-4d36-b0ff-563cb446e8a1",
-                       'test.qa4sm.eu')
+    setup_api()

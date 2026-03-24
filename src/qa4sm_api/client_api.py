@@ -3,16 +3,18 @@ import warnings
 import requests
 import time
 import pandas as pd
-from typing import Union
+from typing import Union, Optional
 import os
 import zipfile
 from pathlib import Path
 from datetime import datetime
+
 from tornado.httpclient import HTTPError
 
 from qa4sm_api.globals import (
     QA4SM_DOTRC_PATH,
     ValidationRunNotFoundError,
+    AuthenticationError,
     ValidationInstanceError,
     _load_dotrc
 )
@@ -97,14 +99,36 @@ class Access:
     @classmethod
     def with_token(cls, instance, token):
         """
-        Load access without token (limited access)
+        Load access with token for a specific instance.
+
+        Parameters
+        ----------
+        instance: str
+            QA4SM instance name
+        token: str
+            API token for the instance
+
+        Returns
+        -------
+        Access
+            Access object with token
         """
         return cls({instance: {'token': token}})
 
     @classmethod
     def without_token(cls, instance):
         """
-        Load access without token (limited access)
+        Create access for instance without token (limited access).
+
+        Parameters
+        ----------
+        instance: str
+            QA4SM instance name
+
+        Returns
+        -------
+        Access
+            Access object with None token (limited access)
         """
         warnings.warn(f"No token was found {instance}, continue as anonymous "
                       f"user (with limited access)")
@@ -115,7 +139,7 @@ class Session:
     """
     Wrapper to send API request to QA4SM after authentication.
     """
-    def __init__(self, instance="qa4sm.eu", token="file", protocol="https"):
+    def __init__(self, instance="qa4sm.eu", token="auto", protocol="https"):
         """
         Session to send requests to QA4SM via API.
 
@@ -213,8 +237,21 @@ class Session:
             user login token
         """
         data = {'username': username, 'password': password}
-        response = self.post(self.url("auth/login"), data=data)
+        try:
+            response = self.post(self.url("auth/login"), data=data)
+        except requests.exceptions.HTTPError as _:
+            raise AuthenticationError(
+                f"Login failed for {username} with the passed "
+                f"credentials. Please make sure that the chosen "
+                f"username/password combination is valid for "
+                f"{self.instance}.")
         token = response.pandas['auth_token']
+        if token is None:
+            raise AuthenticationError(
+                f"User does not have a "
+                f"token yet. Please request one first at "
+                f"https://qa4sm.eu/ui/user-profile."
+            )
         self.login_with_token(token, quiet=quiet)
         return token
 
@@ -226,7 +263,7 @@ class Session:
                       serialize=True,
                       **kwargs) -> Response:
         """
-        Send request. Usually happens already during initialisation.
+        Send request. Usually happens already during initialization.
         Except when the request is delayed. Will try again when a request
         fails temporarily.
         """
@@ -251,9 +288,37 @@ class Session:
                 time.sleep(wait_time_s)
 
     def post(self, url, data, *args, **kwargs) -> Response:
+        """
+        Send a POST request to the API.
+
+        Parameters
+        ----------
+        url: str
+            URL to send the request to
+        data: dict
+            Data to include in the request body
+
+        Returns
+        -------
+        Response
+            Response from the API
+        """
         return self._send_request(url, data, *args, **kwargs)
 
     def get(self, url, *args, **kwargs) -> Response:
+        """
+        Send a GET request to the API.
+
+        Parameters
+        ----------
+        url: str
+            URL to send the request to
+
+        Returns
+        -------
+        Response
+            Response from the API
+        """
         return self._send_request(url, *args, **kwargs)
 
 
@@ -299,7 +364,7 @@ class ValidationConfiguration:
         run_id: str
             UID of the validation run at the chosen instance
             (see connection_kwargs).
-        instance: str, optional (default: "qa4ms.eu")
+        instance: str, optional (default: "qa4sm.eu")
             see qa4sm_api.client_api.Connection
         token: str, optional
             see qa4sm_api.client_api.Connection
@@ -331,12 +396,12 @@ class Connection:
     """
     Communication with QA4SM.
     """
-    def __init__(self, instance: str="qa4sm.eu", token="file",
+    def __init__(self, instance: str="qa4sm.eu", token="auto",
                  protocol="https"):
         """
         Parameters
         ----------
-        instance: str, optional (default: "qa4ms.eu")
+        instance: str, optional (default: "qa4sm.eu")
             service URL or IP:PORT, e.g
             - qa4sm.eu [productive]
             - test.qa4sm.eu [test]
@@ -344,6 +409,8 @@ class Connection:
             - 0.0.0.0:8000 [develop]
         token: str, optional
             Authentication user token (required to POST)
+            - "auto" (default) will try "file" first and continue with "none"
+              otherwise.
             - "file" will search for a token in a .qa4smapirc file
             - "none" will force not using a token (only public commands)
             - "<token>" will use the passed token directly
@@ -365,22 +432,75 @@ class Connection:
                               headers=self.session.headers)
         return re.pandas
 
-    def dataset_id(self, short_name: str) -> int:
-        datasets = self.datasets()
-        idx = datasets.index[datasets['short_name'] == short_name]
+    def _find(self, df, val):
+        """
+        In the passed dataframe, find the rows (ids) that contain val.
+        Will throw an error if the value is not found or if multiple
+        are found.
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            Pandas Dataframe to search
+        val: Any
+            Value to find
+
+        Returns
+        -------
+        id: int
+        """
+        idx = df[df.eq(val).any(axis=1)].index.tolist()
         if len(idx) == 0:
-            raise ValueError(f"The dataset {short_name} was not found. "
-                             f"Please pass a valid name or ID. "
-                             f"`Check Connection.datasets()`")
+            raise ValueError(f"{val} was not found. "
+                             f"Please pass a valid name or ID.")
         elif len(idx) > 1:
-            raise ValueError(f"Multiple datasets {short_name} found. "
+            raise ValueError(f"Multiple instances for {val} found. "
                              f"Please pass a unique name or ID.")
         else:
             idx = idx[0]
 
         return int(idx)
 
+    def dataset_id(self, dataset: str) -> int:
+        """
+        Get dataset ID from short name.
+
+        Parameters
+        ----------
+        dataset: str
+            Dataset short name
+
+        Returns
+        -------
+        id: int
+            Dataset ID
+        """
+        datasets = self.datasets()[['short_name', 'pretty_name']]
+        return self._find(datasets, dataset)
+
+    def version_id(self, version, dataset):
+        """
+        Get the version ID for a passed version name
+
+        Parameters
+        ----------
+        version: str
+            Version name
+        dataset: str or int
+            Dataset id or short name
+
+        Returns
+        -------
+        version_id: int
+            Version ID
+        """
+        versions = self.versions(dataset)[['short_name', 'pretty_name']]
+        return self._find(versions, version)
+
     def datasets(self) -> pd.DataFrame:
+        """
+        Get a list of available datasets.
+        """
         r = self.session.get(self.url("dataset"))
         df = r.pandas
         return df
@@ -412,24 +532,86 @@ class Connection:
 
         return pd.concat(dfs, axis=0).sort_index()
 
-    def dataset_info(self, ds_id) -> pd.Series:
-        ds = self.datasets().loc[ds_id]
-        ds['id'] = ds_id
-        return ds
+    def dataset_info(self, dataset: Union[str, int]) -> pd.Series:
+        """
+        Get dataset metadata
 
-    def version_info(self, vers_id) -> pd.Series:
+        Parameters
+        ----------
+        dataset: str or int
+            Dataset name or ID
+
+        Returns
+        -------
+        ser: pd.Series
+        """
+        if isinstance(dataset, str):
+            ds_id = self.dataset_id(dataset)
+        else:
+            ds_id = dataset
+        ser = self.datasets().loc[ds_id]
+        ser['id'] = ds_id
+        return ser
+
+    def version_info(self, version: Union[str, int],
+                     dataset: Optional[Union[str, int]] = None) -> pd.Series:
+        """
+        Get version metadata
+
+        Parameters
+        ----------
+        version: str or int
+            Version name or ID.
+        dataset: str or int
+            Dataset name or ID that the version belongs to.
+            Only required when version is a string
+
+        Returns
+        -------
+        ser: pd.Series
+        """
+        if isinstance(version, str):
+            vers_id = self.version_id(version, dataset)
+        else:
+            vers_id = version
         re = self.session.get(self.url("dataset-version", vers_id))
-        ds = re.pandas
-        ds['id'] = vers_id
-        return ds
+        ser = re.pandas
+        ser['id'] = vers_id
+        return ser
 
     def variable_info(self, var_id) -> pd.Series:
+        """
+        Get information about a dataset variable.
+
+        Parameters
+        ----------
+        var_id: int
+            The ID of the dataset variable to get information for
+
+        Returns
+        -------
+        ds: pd.Series
+            Information about the dataset variable
+        """
         re = self.session.get(self.url("dataset-variable", var_id))
         ds = re.pandas
         ds['id'] = var_id
         return ds
 
     def filter_info(self, filter_id):
+        """
+        Get information about a data filter.
+
+        Parameters
+        ----------
+        filter_id: int
+            The ID of the data filter to get information for
+
+        Returns
+        -------
+        ds: pd.Series
+            Information about the data filter
+        """
         re = self.session.get(self.url("data-filter"))
         ds = re.pandas
         ds = ds.loc[filter_id, :]
@@ -561,7 +743,7 @@ class Connection:
 
     def download_configuration(self, run_id, out_dir=None):
         """
-        Download validation configuration used for a specific run.):
+        Download validation configuration used for a specific run.
 
         Parameters
         ----------
@@ -666,37 +848,3 @@ class Connection:
         response = self.run_validation(config)
 
         return response
-
-
-if __name__ == '__main__':
-
-    QA4SM_IP_OR_URL = "test.qa4sm.eu"   # "127.0.0.1:8000"  #
-    QA4SM_API_TOKEN = "2b37740a1f6733c9cfc2e1e105abe974ff8c4204"
-    username = "preimesberger"
-    password = "i7j.r308"
-    qa4sm = Connection(QA4SM_IP_OR_URL, QA4SM_API_TOKEN, protocol='https')
-
-    qa4sm = Connection(QA4SM_IP_OR_URL, token='file')
-    qa4sm.login(username, password)
-
-    qa4sm.session
-    qa4sm.download_configuration("332f3873-a5bc-4df2-b8b2-0e025096f83e",
-                                 "/tmp")
-
-    status, p = qa4sm.validation_status("6ec9ced3-3938-4f32-aec7-992bb1dba478")
-    start, end = qa4sm.validation_time("6ec9ced3-3938-4f32-aec7-992bb1dba478")
-
-    qa4sm.user()
-    qa4sm.filter_info(1)
-    qa4sm.version_info(1)
-    qa4sm.versions(1)
-    qa4sm.versions("C3S_combined")
-    qa4sm.get_period(1)
-
-    qa4sm.run_config_validation(
-        "./configs/smos_l2_v700/01-SmosL2-vs-C3sComb-abs.json",
-                  override={"name_tag": "testdtest"}
-    )
-    qa4sm.download_results("6ec9ced3-3938-4f32-aec7-992bb1dba478",
-                          "/tmp/test")
-
