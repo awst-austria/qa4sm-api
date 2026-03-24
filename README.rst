@@ -11,7 +11,7 @@
    :target: https://pypi.org/project/qa4sm-api/
 .. image:: https://img.shields.io/badge/Docs-Documentation-blue?logo=sphinx
    :alt: Documentation
-   :target: https://awst-austria.github.io/qa4sm-api/
+   :target: https://awst-austria.github.io/qa4sm-api/readme.html
 
 
 =========
