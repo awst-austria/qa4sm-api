@@ -3,7 +3,12 @@ import unittest
 from pathlib import Path
 import pandas as pd
 import pytest
+import json
+from unittest.mock import Mock, MagicMock, patch
+from io import BytesIO
+import zipfile as zf
 from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration, ValidationInstanceError
+from qa4sm_api.globals import ValidationRunNotFoundError
 from qa4sm_api.client_api import Access
 
 try:
@@ -145,6 +150,110 @@ class TestConnectionWithToken(unittest.TestCase):
         user = self.con.user()
         assert user['auth_token'] == QA4SM_ACCESS[self.con.session.instance]['token']
         assert user['username'] == self.con.session.user
+
+
+class TestValidationMonitoring(unittest.TestCase):
+
+    def setUp(self):
+        self.con = Connection(instance="test.qa4sm.eu", token="None")
+        self.run_id = "9aeb663b-e24e-4541-8331-6ec3e0318d1f"
+
+    def test_validation_status_done_state(self):
+        """Test validation status for DONE state"""
+        with patch.object(self.con.session, 'get') as mock_get:
+            mock_response = Mock()
+            mock_response.data = [{'status': 'DONE', 'progress': 100}]
+            self.con.session.get = lambda url, headers=None: mock_response
+            
+            status, progress = self.con.validation_status(self.run_id)
+            assert status == 'DONE'
+            assert progress == 100
+
+    def test_validation_status_running_state(self):
+        """Test validation status for RUNNING state"""
+        with patch.object(self.con.session, 'get') as mock_get:
+            mock_response = Mock()
+            mock_response.data = [{'status': 'RUNNING', 'progress': 50}]
+            self.con.session.get = lambda url, headers=None: mock_response
+            
+            status, progress = self.con.validation_status(self.run_id)
+            assert status == 'RUNNING'
+            assert progress == 50
+
+    def test_validation_status_not_found(self):
+        """Test validation status when run doesn't exist"""
+        from tornado.httpclient import HTTPError
+        with patch.object(self.con.session, 'get') as mock_get:
+            mock_get.side_effect = HTTPError(code=404)
+            
+            status, progress = self.con.validation_status(self.run_id)
+            assert status == 'NOT FOUND'
+            assert progress == 0
+
+    def test_validation_time(self):
+        """Test validation timing retrieval"""
+        with patch.object(self.con.session, 'get') as mock_get:
+            mock_response = Mock()
+            mock_response.data = [{
+                'start_time': '2024-03-24T10:00:00Z',
+                'end_time': '2024-03-24T10:30:00Z'
+            }]
+            self.con.session.get = lambda url, headers=None: mock_response
+            
+            start_time, end_time = self.con.validation_time(self.run_id)
+            assert start_time is not None
+            assert end_time is not None
+            assert end_time > start_time
+
+    def test_validation_duration(self):
+        """Test validation duration calculation"""
+        with patch.object(self.con.session, 'get') as mock_get:
+            mock_response = Mock()
+            mock_response.data = [{
+                'duration_seconds': 3600,
+                'duration_format': '1h 0m 0s'
+            }]
+            self.con.session.get = lambda url, headers=None: mock_response
+            
+            seconds, formatted = self.con.validation_duration(self.run_id)
+            assert seconds == 3600
+            assert formatted == '1h 0m 0s'
+
+
+class TestDownloadFunctionality(unittest.TestCase):
+
+    def setUp(self):
+        self.con = Connection(instance="test.qa4sm.eu", token="None")
+        self.run_id = "9aeb663b-e24e-4541-8331-6ec3e0318d1f"
+        self.test_config = {
+            'name_tag': 'test',
+            'interval_from': '2024-01-01',
+            'interval_to': '2024-12-31'
+        }
+
+    def test_download_configuration(self):
+        """Test downloading and saving validation configuration"""
+        with patch.object(self.con.session, 'get') as mock_get:
+            mock_response = Mock()
+            mock_response.data = [self.test_config.copy()]
+            self.con.session.get = lambda url, headers=None: mock_response
+            
+            config = self.con.download_configuration(self.run_id)
+            assert config['name_tag'] == 'test'
+            assert config['interval_from'] == '2024-01-01'
+
+
+class TestErrorCases(unittest.TestCase):
+
+    def setUp(self):
+        self.con = Connection(instance="test.qa4sm.eu", token="None")
+        self.run_id = "9aeb663b-e24e-4541-8331-6ec3e0318d1f"
+
+    @patch('qa4sm_api.client_api.Connection.validation_exists', return_value=False)
+    def test_validation_not_found_error(self, mock_exists):
+        """Test ValidationRunNotFoundError is raised for invalid run ID"""
+        with self.assertRaises(ValidationRunNotFoundError):
+            self.con.validation_time(self.run_id)
 
 
 def test_unknown_instance():
