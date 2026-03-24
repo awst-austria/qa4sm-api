@@ -3,7 +3,7 @@ import warnings
 import requests
 import time
 import pandas as pd
-from typing import Union, Optional
+from typing import Union, Optional, List
 import os
 import zipfile
 from pathlib import Path
@@ -27,7 +27,7 @@ class Response:
             self.response = self.response.json()
 
     @property
-    def data(self) -> list[dict]:
+    def data(self) -> List[dict]:
         if self.response is None:
             raise ValueError("No response data is available")
         elif isinstance(self.response, dict):
