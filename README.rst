@@ -6,7 +6,7 @@
 .. image:: https://img.shields.io/coveralls/github/awst-austria/qa4sm-api/main?logo=coveralls
    :alt: Coveralls
    :target: https://coveralls.io/github/awst-austria/qa4sm-api
-.. image:: https://img.shields.io/pypi/v/qa4sm-api?logo=pypi
+.. image:: https://img.shields.io/pypi/v/qa4sm-api
    :alt: PyPI
    :target: https://pypi.org/project/qa4sm-api/
 .. image:: https://img.shields.io/badge/Docs-Documentation-blue?logo=sphinx
