@@ -1,7 +1,12 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright (c) 2026 TU Wien & AWST
+# SPDX-FileCopyrightText: For a full list of authors, see the AUTHORS file.
+
 from pathlib import Path
 import os
 import  warnings
 import configparser
+
 
 if "QA4SM_DOTRC" in os.environ:
     QA4SM_DOTRC_PATH = Path(os.environ["QA4SM_DOTRC"])
@@ -113,7 +118,8 @@ def _load_dotrc(path=QA4SM_DOTRC_PATH):
     return config
 
 
-def _connect_with_credentials(instance: str, username: str, password: str) -> dict:
+def _connect_with_credentials(instance: str, username: str, password: str,
+                              quiet: bool = True) -> dict:
     """
     Open a Session to the given instance, authenticate with username/password,
     and return the auth token.
@@ -124,7 +130,8 @@ def _connect_with_credentials(instance: str, username: str, password: str) -> di
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        session = Session(instance=instance, token="none")
+        session = Session(instance=instance, token="none", quiet_login=quiet)
         _ = session.login_with_credentials(username=username, password=password)
         access = session.access.access
     return access
+

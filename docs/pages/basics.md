@@ -201,6 +201,19 @@ config = qa4sm.download_configuration(
 )
 ```
 
+## Delete Validation Run
+
+Remove one of **your** online validation runs via its ID.
+
+```python
+# Remove a previously run online validation (that you own). This means that
+#   - the run and all the results are removed
+#   - the validation URL is not accessible anymore
+#   - results are not available for download anymore
+qa4sm.delete(run_id="9aeb663b-e24e-4541-8331-6ec3e0318d1f")
+```
+
+
 ## Quick Start Example
 
 Complete workflow from discovery to results:
@@ -234,7 +247,7 @@ if run_id:
 while True:
     status, progress = qa4sm.validation_status(run_id)
     print(f"Status: {status}, Progress: {progress}%")
-    
+
     if status == 'DONE':
         print("Validation completed successfully!")
         break
@@ -247,6 +260,9 @@ while True:
 # Download results
 qa4sm.download_results(run_id, out_dir="./my_results")
 print(f"Results downloaded to ./my_results/{run_id}.nc")
+
+# Finally, delete the validation run again
+qa4sm.delete(run_id)
 ```
 
 ## Error Handling

@@ -14,7 +14,7 @@ description = "QA4SM webval API access"
 readme = { file = "README.rst", content-type = "text/x-rst" }
 license = { text = "MIT" }
 authors = [
-    { name = "TU Wien", email = "support@qa4sm.eu" },
+    { name = "TU Wien / AWST", email = "support@qa4sm.eu" },
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
