@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright (c) 2026 TU Wien & AWST
+# SPDX-FileCopyrightText: For a full list of authors, see the AUTHORS file.
+
 import os
 import click
 from importlib.metadata import version
@@ -54,7 +58,8 @@ def setup_api(instance=DEFAULT_INSTANCE):
 
     # Retrieve token from the remote instance
     try:
-        cred_access = _connect_with_credentials(instance, username, password)
+        cred_access = _connect_with_credentials(
+            instance, username, password, False)
     except Exception as exc:
         raise click.ClickException(f"Login failed: {exc}") from exc
 
@@ -101,7 +106,7 @@ def cli_check(instance: str) -> None:
     Authenticate with a QA4SM instance using your username and password
     to retrieve and store a token for the chosen instance )in ~/.qa4smapirc.
     """
-    qa4sm = Connection(instance, token='file')
+    qa4sm = Connection(instance, token='file', quiet_login=False)
     user = qa4sm.session.user
     if user is not None:
         click.echo(f"Success, you can now send API commands to {instance}!")
@@ -162,7 +167,7 @@ def cli_validate(conf: str, instance: str) -> None:
 @instance_option
 def cli_download_conf(run_id: str, out_path: str, instance: str) -> None:
     """
-    Download the cofiguration file of an existing online validation run.
+    Download the configuration file of an existing online validation run.
 
     \b
     Arguments:
@@ -214,6 +219,8 @@ def cli_download_results(run_id: str, out_path: str, instance: str) -> None:
     out_path = out_path or os.getcwd()
     qa4sm = Connection(instance, token='file')
     qa4sm.download_results(run_id, out_path, force_download=True)
+
+
 
 
 if __name__ == "__main__":

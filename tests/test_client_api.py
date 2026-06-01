@@ -49,6 +49,9 @@ class TestSession(unittest.TestCase):
 
     def test_url_pretty(self):
         url = self.session.url("asd", "jkl/")
+        assert url == "https://test.qa4sm.eu/api/asd/jkl/"
+
+        url = self.session.url("asd", "jkl")
         assert url == "https://test.qa4sm.eu/api/asd/jkl"
 
     @pytest.mark.skipif(QA4SM_ACCESS is None, reason="No credentials found.")
@@ -86,7 +89,7 @@ class TestConnectionTestInstance(unittest.TestCase):
         self.con = Connection(instance="test.qa4sm.eu", token="None")
 
     def test_token_is_None(self):
-        assert self.con.session.user is None
+        assert self.con.session.user == "ANONYMOUS"
 
     def test_get_datasets(self):
         ds = self.con.datasets()
@@ -132,7 +135,8 @@ class TestConnectionTestInstance(unittest.TestCase):
         assert pd.to_datetime(start) < pd.to_datetime(end)
 
 
-@pytest.mark.skipif(QA4SM_ACCESS is None, reason="No Access credentials available.")
+@pytest.mark.skipif(QA4SM_ACCESS is None,
+                    reason="No Access credentials available.")
 class TestConnectionWithToken(unittest.TestCase):
 
     def setUp(self):
@@ -142,6 +146,9 @@ class TestConnectionWithToken(unittest.TestCase):
 
     def test_url(self):
         assert (self.con.url("asd", "jkl/") ==
+                "https://test.qa4sm.eu/api/asd/jkl/")
+
+        assert (self.con.url("asd", "jkl") ==
                 "https://test.qa4sm.eu/api/asd/jkl")
 
     def test_user(self):
@@ -247,7 +254,8 @@ class TestErrorCases(unittest.TestCase):
         self.con = Connection(instance="test.qa4sm.eu", token="None")
         self.run_id = "9aeb663b-e24e-4541-8331-6ec3e0318d1f"
 
-    @patch('qa4sm_api.client_api.Connection.validation_exists', return_value=False)
+    @patch('qa4sm_api.client_api.Connection.validation_exists',
+           return_value=False)
     def test_validation_not_found_error(self, mock_exists):
         """Test ValidationRunNotFoundError is raised for invalid run ID"""
         with self.assertRaises(ValidationRunNotFoundError):

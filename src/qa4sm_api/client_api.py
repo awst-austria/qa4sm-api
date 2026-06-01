@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright (c) 2026 TU Wien & AWST
+# SPDX-FileCopyrightText: For a full list of authors, see the AUTHORS file.
+
 import json
 import warnings
 import requests
@@ -8,6 +12,8 @@ import os
 import zipfile
 from pathlib import Path
 from datetime import datetime
+import pprint as pprint
+
 
 from tornado.httpclient import HTTPError
 
@@ -56,6 +62,15 @@ class Access:
         """
         self.access = access
 
+    def __repr__(self):
+        try:
+            instances = list(self.access.keys())
+            n = len(instances)
+        except TypeError:
+            instances = []
+            n = 0
+        return f"{n} QA4SM Instances: {instances}"
+
     def __getitem__(self, item):
         return self.access[item]
 
@@ -65,8 +80,7 @@ class Access:
         try:
             return cls.from_env()
         except EnvironmentError:
-            cls.from_dotrcfile()
-
+            return cls.from_dotrcfile()
 
     @classmethod
     def from_env(cls):
@@ -131,7 +145,8 @@ class Access:
         Access
             Access object with None token (limited access)
         """
-        warnings.warn(f"No token was found {instance}, continue as anonymous "
+        warnings.warn(f"No token was found for {instance}, "
+                      f"continue as anonymous "
                       f"user (with limited access)")
         return cls({instance: {'token': None}})
 
@@ -140,7 +155,11 @@ class Session:
     """
     Wrapper to send API request to QA4SM after authentication.
     """
-    def __init__(self, instance="qa4sm.eu", token="auto", protocol="https"):
+    _max_retries = 10       # for all requests
+    _wait_retry_s = 0.1     # seconds between requests
+
+    def __init__(self, instance="qa4sm.eu", token="auto", protocol="https",
+                 quiet_login=True):
         """
         Session to send requests to QA4SM via API.
 
@@ -160,6 +179,8 @@ class Session:
             Developer setting. Use https for the public instances (test, prod)
             or http for local instances.
             e.g., 127.0.0.1:8000
+        quiet_login: bool, optional
+            Don't print welcome message on login.
         """
         self.headers = {
             "Content-Type": "application/json"
@@ -167,20 +188,28 @@ class Session:
         self.instance = instance
         self.base_url = f"{protocol}://{self.instance}/"
         self.api_url = self.base_url + "api/"
+        self.quiet_login = quiet_login
 
         self.client = requests.Session()
         self.response = None
 
         if token == "auto":
-            self.access = Access.from_available()
+            try:
+                self.access = Access.from_available()
+            except FileNotFoundError as e:
+                warnings.warn(f"{str(e)}. Continue as ANONYMOUS user.")
+                self.access = Access.without_token(self.instance)
         elif token == "file":
             self.access = Access.from_dotrcfile()
-        elif token.lower() == "none":
+        elif token is None or token.lower() == "none":
             self.access = Access.without_token(self.instance)
-        else:
+        elif isinstance(token, str):
             self.access = Access.with_token(self.instance, token)
+        else:
+            raise NotImplementedError("token must be one of "
+                                      "['auto', 'file', 'none', or <TOKEN>]")
 
-        self.user = None
+        self.user = "ANONYMOUS"
         if instance not in list(self.access.access.keys()):
             raise ValidationInstanceError(f"Unknown instance {instance}. "
                                           f"Please add it to your .qa4smapirc file.")
@@ -192,16 +221,19 @@ class Session:
             warnings.warn("No token was passed, limited API access. "
                           "Only public API calls are possible.")
 
+    def __repr__(self):
+        return f"{self.user}@{self.instance}"
+
     def url(self, *args) -> str:
         # Join URL parts
         args = [str(a) for a in args]
         url = '/'.join(args).replace('//', '/')
-        if url.endswith('/'):
-            url = url[:-1]
+        # if url.endswith('/'):
+        #     url = url[:-1]
 
         return self.api_url + url
 
-    def login_with_token(self, token, quiet=False) -> int:
+    def login_with_token(self, token) -> int:
         """
         status_code
         200: OK, login successful
@@ -209,7 +241,7 @@ class Session:
         self.headers["Authorization"] = f"Token {token}"
         re = self.get(self.url("auth/login"), headers=self.headers)
         username = re.pandas['username']
-        if not quiet:
+        if not self.quiet_login:
             print(f"Hi, {username}! You're successfully logged "
                   f"in at {self.api_url}!")
         self.user = username
@@ -217,8 +249,7 @@ class Session:
                                   {'token': token, 'username': self.user}})
         return 200
 
-    def login_with_credentials(self, username=None, password=None,
-                               quiet=False):
+    def login_with_credentials(self, username=None, password=None):
         """
         Authenticate with username and password to receive a token for
         subsequent requests.
@@ -253,42 +284,45 @@ class Session:
                 f"token yet. Please request one first at "
                 f"https://qa4sm.eu/ui/user-profile."
             )
-        self.login_with_token(token, quiet=quiet)
+        self.login_with_token(token)
         return token
 
-    def _send_request(self,
-                      url,
-                      data=None,
-                      max_retries: int = 5,
-                      wait_time_s: float = 0.1,
-                      serialize=True,
-                      **kwargs) -> Response:
+    def delete(self, url, serialize=True, **kwargs):
         """
-        Send request. Usually happens already during initialization.
-        Except when the request is delayed. Will try again when a request
-        fails temporarily.
+        Send a DELETE request to the API. Retry on fail.
+
+        Parameters
+        ----------
+        url: str
+            URL to send the request to
+        serialize: bool, optional
+            Whether the response should be json serialized
+        kwargs:
+            Additional kwargs are passed to requests.delete
+
+        Returns
+        -------
+        Response
+            Response from the API
         """
-        for attempt in range(max_retries):
+        if self.headers is None:
+            raise ValueError("No headers found to post request.")
+
+        for attempt in range(self._max_retries):
             try:
-                if data is None:
-                    response = requests.get(url, timeout=10, **kwargs)
-                else:
-                    if self.headers is None:
-                        raise ValueError("No headers found to post request.")
-                    response = requests.post(url, headers=self.headers,
-                                             json=data, timeout=10, **kwargs)
+                response = requests.delete(url, headers=self.headers,
+                                           timeout=10, **kwargs)
                 response.raise_for_status()
                 response = Response(response, serialize=serialize)
                 self.response = response
                 return response
-
             except requests.exceptions.RequestException as e:
-                if attempt == max_retries - 1:  # Last attempt
+                if attempt == self._max_retries - 1:  # Last attempt
                     raise e
+                time.sleep(self._wait_retry_s)
 
-                time.sleep(wait_time_s)
-
-    def post(self, url, data, *args, **kwargs) -> Response:
+    def post(self, url, data, serialize=True,
+             **kwargs) -> Response:
         """
         Send a POST request to the API.
 
@@ -298,15 +332,34 @@ class Session:
             URL to send the request to
         data: dict
             Data to include in the request body
+        serialize: bool, optional
+            Whether the response should be json serialized
+        kwargs:
+            Additional kwargs are passed to requests.delete
 
         Returns
         -------
         Response
             Response from the API
         """
-        return self._send_request(url, data, *args, **kwargs)
+        if self.headers is None:
+            raise ValueError("No headers found to post request.")
 
-    def get(self, url, *args, **kwargs) -> Response:
+        for attempt in range(self._max_retries):
+            try:
+                response = requests.post(url, headers=self.headers,
+                                         json=data, timeout=10, **kwargs)
+                response.raise_for_status()
+                response = Response(response, serialize=serialize)
+                self.response = response
+                return response
+            except requests.exceptions.RequestException as e:
+                if attempt == self._max_retries - 1:  # Last attempt
+                    raise e
+                time.sleep(self._wait_retry_s)
+
+
+    def get(self, url, serialize=True, **kwargs) -> Response:
         """
         Send a GET request to the API.
 
@@ -314,18 +367,38 @@ class Session:
         ----------
         url: str
             URL to send the request to
+        serialize: bool, optional
+            Whether the response should be json serialized
+        kwargs:
+            Additional kwargs are passed to requests.delete
 
         Returns
         -------
         Response
             Response from the API
         """
-        return self._send_request(url, *args, **kwargs)
+        for attempt in range(self._max_retries):
+            try:
+                response = requests.get(url, timeout=10, **kwargs)
+                response.raise_for_status()
+                response = Response(response, serialize=serialize)
+                self.response = response
+                return response
+
+            except requests.exceptions.RequestException as e:
+                if attempt == self._max_retries - 1:  # Last attempt
+                    raise e
+
+                time.sleep(self._wait_retry_s)
+
 
 
 class ValidationConfiguration:
     def __init__(self, config_data: dict):
         self.data = config_data[0] if len(config_data) == 1 else config_data
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(data={pprint.pformat(self.data)})"
 
     def __getitem__(self, item):
         return self.data[item]
@@ -398,7 +471,7 @@ class Connection:
     Communication with QA4SM.
     """
     def __init__(self, instance: str="qa4sm.eu", token="auto",
-                 protocol="https"):
+                 protocol="https", quiet_login=True):
         """
         Parameters
         ----------
@@ -419,8 +492,18 @@ class Connection:
             Developer setting. Use https for the public instances (test, prod)
             or http for local instances.
             e.g., 127.0.0.1:8000
+        quiet_login: bool, optional
+            Don't print welcome message on login.
         """
-        self.session = Session(instance, token, protocol)
+        self.session = Session(instance, token, protocol, quiet_login)
+
+
+    def __repr__(self):
+        s = f"{type(self).__module__}.{type(self).__qualname__}"
+        return f"{s}(session={self.session})"
+
+    def _verify_connection(self):
+        self.user()
 
     def url(self, *args, **kwargs) -> str:
         return self.session.url(*args, **kwargs)
@@ -764,6 +847,21 @@ class Connection:
         if out_dir is not None:
             config.dump(os.path.join(out_dir, f"{run_id}.json"))
         return config
+
+    def delete(self, run_id):
+        """
+        Completely delete an online validation run. This means that the results
+        cannot be accessed anymore afterwards.
+
+        Parameters
+        ----------
+        run_id: str
+            UID of remote run to download results for
+        """
+        url = self.url(f"delete-validation/{run_id}/")
+        response = self.session.delete(url, serialize=False)
+        return response
+
 
     def download_results(self, run_id, out_dir, force_download=False):
         """
