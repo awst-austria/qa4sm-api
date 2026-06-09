@@ -2,11 +2,10 @@ import os
 
 import tempfile
 import unittest
-from IPython.testing.decorators import skipif
 from pathlib import Path
 import pandas as pd
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 import requests
 from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration, ValidationInstanceError
 from qa4sm_api.globals import ValidationRunNotFoundError, AuthenticationError, _write_dotrc, _load_dotrc
