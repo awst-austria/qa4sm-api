@@ -22,7 +22,8 @@ from qa4sm_api.globals import (
     ValidationRunNotFoundError,
     AuthenticationError,
     ValidationInstanceError,
-    _load_dotrc
+    _load_dotrc,
+    make_dummy_ok_response
 )
 
 
@@ -287,7 +288,8 @@ class Session:
         self.login_with_token(token)
         return token
 
-    def delete(self, url, serialize=True, **kwargs):
+    def delete(self, url, serialize=True, dry_run=False,
+               **kwargs):
         """
         Send a DELETE request to the API. Retry on fail.
 
@@ -297,6 +299,8 @@ class Session:
             URL to send the request to
         serialize: bool, optional
             Whether the response should be json serialized
+        dry_run: bool, optional
+            Don't perform the actual deletion. Return dummy response.
         kwargs:
             Additional kwargs are passed to requests.delete
 
@@ -310,8 +314,12 @@ class Session:
 
         for attempt in range(self._max_retries):
             try:
-                response = requests.delete(url, headers=self.headers,
-                                           timeout=10, **kwargs)
+                if dry_run:
+                    response = make_dummy_ok_response()
+                else:
+                    response = requests.delete(url, headers=self.headers,
+                                               timeout=10, **kwargs)
+
                 response.raise_for_status()
                 response = Response(response, serialize=serialize)
                 self.response = response
@@ -448,7 +456,6 @@ class ValidationConfiguration:
         connection = Connection(**connection_kwargs)
         config = connection.download_configuration(run_id=run_id)
         return cls(config_data=config.data)
-
 
     @classmethod
     def from_file(cls, path):
@@ -848,7 +855,7 @@ class Connection:
             config.dump(os.path.join(out_dir, f"{run_id}.json"))
         return config
 
-    def delete(self, run_id):
+    def delete(self, run_id, dry_run=False):
         """
         Completely delete an online validation run. This means that the results
         cannot be accessed anymore afterwards.
@@ -857,11 +864,18 @@ class Connection:
         ----------
         run_id: str
             UID of remote run to download results for
+        dry_run: bool, optional
+            Don't perform the actual deletion. Return dummy response.
+
+        Returns
+        -------
+        response: Response
+            Response from server. Dummy OK response for dry_run=True.
         """
         url = self.url(f"delete-validation/{run_id}/")
-        response = self.session.delete(url, serialize=False)
+        response = self.session.delete(url, serialize=False,
+                                       dry_run=dry_run)
         return response
-
 
     def download_results(self, run_id, out_dir, force_download=False):
         """
@@ -947,3 +961,5 @@ class Connection:
         response = self.run_validation(config)
 
         return response
+
+

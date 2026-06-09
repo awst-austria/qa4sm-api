@@ -1,9 +1,9 @@
 import os
-from pathlib import Path
 from tempfile import TemporaryDirectory
-from qa4sm_api.globals import _load_dotrc
+from qa4sm_api.globals import _load_dotrc, make_dummy_ok_response
 
 content = "[DEFAULT]\ntoken: asdf123\n\n[test.qa4sm.eu]\ntoken: hjkl456\nsomethingelse: 123"
+
 
 def test_load_credentials_file():
     with TemporaryDirectory() as tmpdir:

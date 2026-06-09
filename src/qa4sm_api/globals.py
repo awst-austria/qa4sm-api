@@ -6,6 +6,8 @@ from pathlib import Path
 import os
 import  warnings
 import configparser
+from datetime import datetime
+import requests
 
 
 if "QA4SM_DOTRC" in os.environ:
@@ -135,3 +137,11 @@ def _connect_with_credentials(instance: str, username: str, password: str,
         access = session.access.access
     return access
 
+
+def make_dummy_ok_response(json_data: dict = None, text: str = "",
+                           status_code: int = 200) -> requests.Response:
+    response = requests.models.Response()
+    response.status_code = status_code
+    response.headers["Content-Type"] = "application/json"
+    response._content = (text or "").encode("utf-8")
+    return response

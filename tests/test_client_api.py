@@ -1,18 +1,22 @@
+import os
+
 import tempfile
 import unittest
+from IPython.testing.decorators import skipif
 from pathlib import Path
 import pandas as pd
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import requests
 from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration, ValidationInstanceError
-from qa4sm_api.globals import ValidationRunNotFoundError
+from qa4sm_api.globals import ValidationRunNotFoundError, AuthenticationError
 from qa4sm_api.client_api import Access
 
 try:
     QA4SM_ACCESS = Access.from_available().access
 except:
     QA4SM_ACCESS = None
+
 
 class TestResponse(unittest.TestCase):
     re = [{'username': 'testuser', 'email': 'test.user@test.com',
@@ -46,6 +50,11 @@ class TestSession(unittest.TestCase):
 
     def setUp(self) -> None:
         self.session = Session(instance="test.qa4sm.eu", token="none")
+
+    def test_login_fails(self):
+        with pytest.raises(AuthenticationError):
+            self.session.login_with_credentials(
+                "asd", "asd")
 
     def test_url_pretty(self):
         url = self.session.url("asd", "jkl/")
@@ -134,6 +143,17 @@ class TestConnectionTestInstance(unittest.TestCase):
         start, end = self.con.get_period(70)
         assert pd.to_datetime(start) < pd.to_datetime(end)
 
+    def test_download_results(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            val_id = "d9cf81c7-5c1c-4341-8a0c-4d6fcfb91677"
+            self.con.download_results(val_id, out_dir=tmpdir,
+                                      force_download=True)
+            assert f"{val_id}.nc" in os.listdir(tmpdir)
+            assert "summary_stats.csv" in os.listdir(tmpdir)
+            assert "qa4sm_graphics" in os.listdir(tmpdir)
+            assert len(os.listdir(Path(tmpdir) / "qa4sm_graphics")) > 0
+
+
 
 @pytest.mark.skipif(QA4SM_ACCESS is None,
                     reason="No Access credentials available.")
@@ -155,6 +175,13 @@ class TestConnectionWithToken(unittest.TestCase):
         user = self.con.user()
         assert user['auth_token'] == QA4SM_ACCESS[self.con.session.instance]['token']
         assert user['username'] == self.con.session.user
+
+    def test_delete_validation(self):
+        # dry run, dummy respone, validation doesn't actually exist
+        response = self.con.delete("xx99999999999-9999-9999",
+                                   dry_run=True)
+        assert isinstance(response, Response)
+        assert response.response.status_code == 200
 
 
 class TestValidationMonitoring(unittest.TestCase):
