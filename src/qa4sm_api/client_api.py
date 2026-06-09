@@ -95,7 +95,7 @@ class Access:
         except KeyError:
             raise EnvironmentError("QA4SM_TOKEN not found in environment "
                                    "variables.")
-        access = {instance: token}
+        access = {instance: {"token": token}}
 
         return cls(access)
 

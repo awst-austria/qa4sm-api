@@ -364,7 +364,7 @@ class TestAccessEnv(unittest.TestCase):
             "QA4SM_TOKEN": "test_token"
         }):
             access = Access.from_env()
-            assert access.access["test.qa4sm.eu"] == "test_token"
+            assert access.access["test.qa4sm.eu"] == {"token": "test_token"}
 
 
 def test_unknown_instance():
