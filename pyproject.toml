@@ -25,8 +25,7 @@ requires-python = ">=3.8"
 dependencies = [
     "pandas",
     "click",
-    "requests",
-    "tornado"
+    "requests"
 ]
 dynamic = ["version"]
 
@@ -60,6 +59,10 @@ exclude = ["tests*"]
 addopts = "--cov qa4sm_api --cov-report term-missing --verbose"
 norecursedirs = ["dist", "build", ".tox"]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore:No token was found for.*continue as anonymous:UserWarning",
+    "ignore:No token was passed, limited API access:UserWarning",
+]
 
 # NOTE: flake8 does not natively support pyproject.toml.
 # To use [tool.flake8] here, install the `flake8-pyproject` plugin.

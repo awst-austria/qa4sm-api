@@ -15,7 +15,7 @@ from datetime import datetime
 import pprint as pprint
 
 
-from tornado.httpclient import HTTPError
+
 
 from qa4sm_api.globals import (
     QA4SM_DOTRC_PATH,
@@ -23,7 +23,8 @@ from qa4sm_api.globals import (
     AuthenticationError,
     ValidationInstanceError,
     _load_dotrc,
-    make_dummy_ok_response
+    make_dummy_ok_response,
+    Qa4smEnvironmentError
 )
 
 
@@ -80,7 +81,7 @@ class Access:
         # Try first if the environment variables are set
         try:
             return cls.from_env()
-        except EnvironmentError:
+        except Qa4smEnvironmentError:
             return cls.from_dotrcfile()
 
     @classmethod
@@ -88,14 +89,14 @@ class Access:
         try:
             instance = os.environ["QA4SM_INSTANCE"]
         except KeyError:
-            raise EnvironmentError("QA4SM_INSTANCE not found in environment "
-                                   "variables.")
+            raise Qa4smEnvironmentError(
+                "QA4SM_INSTANCE not found in environment variables.")
         try:
             token = os.environ["QA4SM_TOKEN"]
         except KeyError:
-            raise EnvironmentError("QA4SM_TOKEN not found in environment "
-                                   "variables.")
-        access = {instance: token}
+            raise Qa4smEnvironmentError(
+                "QA4SM_TOKEN not found in environment variables.")
+        access = {instance: {"token": token}}
 
         return cls(access)
 
@@ -738,7 +739,7 @@ class Connection:
         """
         try:
             _ = self._remote_val_status(validation_id)
-        except HTTPError:
+        except requests.exceptions.HTTPError:
             return False
         return True
 

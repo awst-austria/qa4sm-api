@@ -41,8 +41,18 @@ Verify that your stored credentials allow access to a QA4SM instance.
 qa4sm api check
 ```
 
+This command will:
+- Read your stored token from `~/.qa4smapirc`
+- Attempt to login to the specified instance
+- Display a success or failure message
+
 **Options:**
 - `-i, --instance TEXT`: QA4SM instance to check [default: qa4sm.eu]
+
+**Example output:**
+```
+Success, you can now send API commands to qa4sm.eu!
+```
 
 ### Validation Commands
 

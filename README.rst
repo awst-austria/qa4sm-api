@@ -111,57 +111,41 @@ for more examples.
 
 .. code-block:: python
 
-   >> from qa4sm_api.client_api import Connection, ValidationConfiguration
-   # Initialize connection
-   >> conn = Connection()
+   >>> from qa4sm_api.client_api import Connection, ValidationConfiguration
+   >>> conn = Connection()
    Hi, <username>! You're successfully logged in at https://qa4sm.eu/api/!
 
+   >>> conn.datasets()[['short_name']]
+                           short_name
+   id
+   1                     C3S_combined
+   2                          SMAP_L3
+   3                            ASCAT
+   4                             ISMN
+   5                            GLDAS
+   6              ESA_CCI_SM_combined
+   7                          SMOS_IC
+   ...                         ...
 
-.. code-block:: python
-
-   # Get a list of available datasets
-   >> conn.datasets()[['short_name']]
-    Out[10]:
-                            short_name
-    id
-    1                     C3S_combined
-    2                          SMAP_L3
-    3                            ASCAT
-    4                             ISMN
-    5                            GLDAS
-    6              ESA_CCI_SM_combined
-    7                          SMOS_IC
-    ...                         ...
-   # Get a list of versions for a datasets
-
-
-.. code-block:: python
-
-   >> conn.versions("C3S_combined")
-    Out[6]:
-         short_name pretty_name  ... time_range_end geographical_range
-    1   C3S_V201706     v201706  ...     2022-10-10               None
-    10  C3S_V201812     v201812  ...     2018-12-31               None
-    28  C3S_V201912     v201912  ...     2019-12-31               None
-    31  C3S_V202012     v202012  ...     2020-12-31               None
-    45  C3S_V202212     v202212  ...     2025-07-20               None
-    58  C3S_V202312     v202312  ...     2025-07-20               None
-    70  C3S_V202505     v202505  ...     2024-12-31               None
+   >>> conn.versions("C3S_combined")
+        short_name pretty_name  ... time_range_end geographical_range
+   1   C3S_V201706     v201706  ...     2022-10-10               None
+   10  C3S_V201812     v201812  ...     2018-12-31               None
+   28  C3S_V201912     v201912  ...     2019-12-31               None
+   31  C3S_V202012     v202012  ...     2020-12-31               None
+   45  C3S_V202212     v202212  ...     2025-07-20               None
+   58  C3S_V202312     v202312  ...     2025-07-20               None
+   70  C3S_V202505     v202505  ...     2024-12-31               None
 
 
 .. code-block:: python
 
-   # Download the configuration for a validation run
-   >> config = conn.download_configuration("9aeb663b-e24e-4541-8331-6ec3e0318d1f")
-   >> print(config.data)
+   >>> config = conn.download_configuration("9aeb663b-e24e-4541-8331-6ec3e0318d1f")
+   >>> print(config.data)
    {'name_tag': 'Test Case  QA4SM_VA_metrics - Test scaling_no_scaling_DEFAULT', 'interval_from': '1978-11-01', 'interval_to': '2024-12-31', 'temporal_matching': 12, 'anomalies_method': 'none', 'anomalies_from': None, 'anomalies_to': None, 'min_lat': 34.0, 'min_lon': -11.2, 'max_lat': 71.6, 'max_lon': 48.3, 'scaling_method': 'none', 'metrics': [{'id': 'tcol', 'value': False}, {'id': 'bootstrap_tcol_cis', 'value': False}, {'id': 'stability_metrics', 'value': False}], 'intra_annual_metrics': {'intra_annual_metrics': False, 'intra_annual_type': '', 'intra_annual_overlap': None}, 'dataset_configs': [{'dataset_id': 1, 'version_id': 70, 'variable_id': 1, 'is_spatial_reference': False, 'is_temporal_reference': True, 'is_scaling_reference': False, 'basic_filters': [1], 'parametrised_filters': []}, {'dataset_id': 4, 'version_id': 69, 'variable_id': 4, 'is_spatial_reference': True, 'is_temporal_reference': False, 'is_scaling_reference': False, 'basic_filters': [1, 2], 'parametrised_filters': [{'id': 18, 'parameters': 'AMMA-CATCH,DAHRA,TAHMO,SD_DEM,CHINA,CTP_SMTMN,HiWATER_EHWSN,HSC_SEOLMACHEON,IIT_KANPUR,KHOREZM,MAQU,MONGOLIA,MySMNet,RUSWET-AGRO,RUSWET-GRASS,RUSWET-VALDAI,SKKU,SW-WHU,KIHS_CMC,KIHS_SMC,VDS,NAQU,NGARI,SMN-SDR,SONTE-China,WIT-Network,AACES,OZNET,SASMAS,BIEBRZA_S-1,CALABRIA,CAMPANIA,FMI,FR_Aqui,GROW,GTK,HOBE,HYDROL-NET_PERUGIA,IMA_CAN1,METEROBS,MOL-RAO,ORACLE,REMEDHUS,RSMN,SMOSMANIA,SWEX_POLAND,TERENO,UDC_SMOS,UMBRIA,UMSUOL,VAS,WEGENERNET,WSMN,HOAL,IPE,COSMOS-UK,LABFLUX,NVE,Ru_CFR,STEMS,TWENTE,XMS-CAT,ARM,AWDN,BNZ-LTER,FLUXNET-AMERIFLUX,ICN,IOWA,PBO_H2O,RISMA,SCAN,SNOTEL,SOILSCAPE,USCRN,USDA-ARS,TxSON,LAB-net,PTSMN'}, {'id': 24, 'parameters': '0.00,0.10'}]}], 'settings_changes': {'filters': [], 'anomalies': False, 'scaling': False, 'variables': [], 'versions': []}}
 
-.. code-block:: python
-
-   # Start a new validation using the local validation configuration
-   >> r = conn.start_validation(config)
-   # The validation run is now triggered under your user account, check https://qa4sm.eu/ui/my-validations
-   >> print(r.status)
+   >>> r = conn.start_validation(config)
+   >>> print(r.status)
    'SCHEDULED'
 
 CLI Commands
@@ -169,9 +153,9 @@ CLI Commands
 
 - ``qa4sm api setup`` - Configure authentication
 - ``qa4sm api check`` - Verify authentication
-- ``qa4sm validate CONFIG.json`` - Submit a validation run
-- ``qa4sm download config RUN_ID`` - Download configuration
-- ``qa4sm download results RUN_ID`` - Download validation results
+- ``qa4sm validate <CONFIG.json>`` - Submit a validation run
+- ``qa4sm download config <RUN_ID>`` - Download configuration
+- ``qa4sm download results <RUN_ID>`` - Download validation results
 
 Use ``qa4sm --help`` for all commands.
 

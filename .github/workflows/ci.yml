@@ -49,6 +49,9 @@ jobs:
           pip install build -e .[testing]
       - name: Run all tests
         shell: bash -l {0}
+        env:  # so some of the optional tests can log in to test.qa4sm.eu
+          QA4SM_INSTANCE: ${{ secrets.QA4SM_INSTANCE }}
+          QA4SM_TOKEN: ${{ secrets.QA4SM_TOKEN }}
         run: |
           pytest
       - name: Export Environment
