@@ -255,9 +255,8 @@ class TestValidationMonitoring(unittest.TestCase):
 
     def test_validation_status_not_found(self):
         """Test validation status when run doesn't exist"""
-        from tornado.httpclient import HTTPError
         with patch.object(self.con.session, 'get') as mock_get:
-            mock_get.side_effect = HTTPError(code=404)
+            mock_get.side_effect = requests.exceptions.HTTPError(response=Mock(status_code=404))
             
             status, progress = self.con.validation_status(self.run_id)
             assert status == 'NOT FOUND'

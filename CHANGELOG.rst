@@ -7,6 +7,7 @@ Unreleased
 - Delete validation run via API
 - Add pytest warning filters for expected authentication warnings
 - Improve CLI documentation and fix docstrings
+- Remove unnecessary tornado dependency (replaced with requests.exceptions.HTTPError)
 
 Version 0.1
 ===========

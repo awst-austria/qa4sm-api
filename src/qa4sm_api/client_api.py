@@ -15,7 +15,7 @@ from datetime import datetime
 import pprint as pprint
 
 
-from tornado.httpclient import HTTPError
+
 
 from qa4sm_api.globals import (
     QA4SM_DOTRC_PATH,
@@ -738,7 +738,7 @@ class Connection:
         """
         try:
             _ = self._remote_val_status(validation_id)
-        except HTTPError:
+        except requests.exceptions.HTTPError:
             return False
         return True
 
