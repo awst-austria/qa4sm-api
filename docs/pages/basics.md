@@ -64,6 +64,7 @@ are then sent through this connection.
 ```python
 from qa4sm_api.client_api import Connection
 
+# Initialize connection (automatically uses token from ~/.qa4smapirc)
 qa4sm = Connection()
 ```
 ## Connection - Core API Methods
@@ -75,7 +76,8 @@ The `Connection` class is the main interface to the QA4SM service.
 ```python
 from qa4sm_api.client_api import Connection
 
-qa4sm = Connection(instance="qa4sm.eu", token="file")
+# Initialize connection (uses token from ~/.qa4smapirc)
+qa4sm = Connection()
 
 # Get all available datasets (and their ID) as a DataFrame
 datasets = qa4sm.datasets()
@@ -142,7 +144,7 @@ config = ValidationConfiguration.from_file("my_config.json")
 config = ValidationConfiguration.from_remote(
     run_id="9aeb663b-e24e-4541-8331-6ec3e0318d1f",
     instance="qa4sm.eu",
-    token="file"
+    token="auto"
 )
 
 # Save configuration to a JSON file
@@ -222,8 +224,8 @@ Complete workflow from discovery to results:
 from qa4sm_api.client_api import Connection, ValidationConfiguration
 import time
 
-# Initialize connection
-qa4sm = Connection(instance="qa4sm.eu", token="file")
+# Initialize connection (uses token from ~/.qa4smapirc)
+qa4sm = Connection()
 
 # Discover available datasets
 datasets = qa4sm.datasets()
@@ -278,7 +280,7 @@ except ValidationRunNotFoundError:
     print("Validation run not found")
 
 try:
-    connection = Connection(instance="unknown-instance", token="file")
+    connection = Connection(instance="unknown-instance", token="auto")
 except ValidationInstanceError:
     print("Unknown validation instance")
 ```

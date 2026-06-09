@@ -103,8 +103,7 @@ def cli_setup(instance: str) -> None:
 @instance_option
 def cli_check(instance: str) -> None:
     """
-    Authenticate with a QA4SM instance using your username and password
-    to retrieve and store a token for the chosen instance )in ~/.qa4smapirc.
+    Verify that your stored credentials allow access to a QA4SM instance.
     """
     qa4sm = Connection(instance, token='file', quiet_login=False)
     user = qa4sm.session.user

@@ -5,6 +5,8 @@ Changelog
 Unreleased
 ==========
 - Delete validation run via API
+- Add pytest warning filters for expected authentication warnings
+- Improve CLI documentation and fix docstrings
 
 Version 0.1
 ===========
