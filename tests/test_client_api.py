@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 import requests
 from qa4sm_api.client_api import Connection, Session, Response, ValidationConfiguration, ValidationInstanceError
-from qa4sm_api.globals import ValidationRunNotFoundError, AuthenticationError
+from qa4sm_api.globals import ValidationRunNotFoundError, AuthenticationError, _write_dotrc, _load_dotrc
 from qa4sm_api.client_api import Access
 
 try:
@@ -45,6 +45,11 @@ class TestResponse(unittest.TestCase):
         assert data['username'] == 'testuser'
         assert data['is_staff'] == True
 
+    def test_data_when_response_is_none(self):
+        response = Response(None, serialize=False)
+        with pytest.raises(ValueError, match="No response data"):
+            _ = response.data
+
 
 class TestSession(unittest.TestCase):
 
@@ -69,6 +74,13 @@ class TestSession(unittest.TestCase):
         status_code = self.session.login_with_token(token)
         assert status_code == 200
 
+    def test_token_auto_missing_dotrc(self):
+        with patch.object(Access, 'from_available') as mock:
+            mock.side_effect = FileNotFoundError("No dotrc")
+            with pytest.warns(UserWarning, match="Continue as ANONYMOUS"):
+                session = Session(instance="test.qa4sm.eu", token="auto")
+            assert session.user == "ANONYMOUS"
+
 
 class TestValidationConfiguration(unittest.TestCase):
 
@@ -90,6 +102,11 @@ class TestValidationConfiguration(unittest.TestCase):
             also_config = ValidationConfiguration.from_file(
                 tmpdir / "config.json")
             assert self.config == also_config
+
+    def test_setitem_key_not_exists(self):
+        config = ValidationConfiguration([{'key': 'value'}])
+        with pytest.raises(KeyError, match="badkey"):
+            config['badkey'] = 'new'
 
 
 class TestConnectionTestInstance(unittest.TestCase):
@@ -153,6 +170,11 @@ class TestConnectionTestInstance(unittest.TestCase):
             assert "qa4sm_graphics" in os.listdir(tmpdir)
             assert len(os.listdir(Path(tmpdir) / "qa4sm_graphics")) > 0
 
+    def test_find_multiple_matches(self):
+        df = pd.DataFrame({'col': ['a', 'a']}, index=[1, 2])
+        with pytest.raises(ValueError, match="Multiple"):
+            self.con._find(df, 'a')
+
 
 
 @pytest.mark.skipif(QA4SM_ACCESS is None,
@@ -182,6 +204,26 @@ class TestConnectionWithToken(unittest.TestCase):
                                    dry_run=True)
         assert isinstance(response, Response)
         assert response.response.status_code == 200
+
+    def test_run_config_validation_with_override(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, 'config.json')
+            with open(config_path, 'w') as f:
+                f.write('[{"name": "test", "value": 1}]')
+            
+            with patch.object(self.con, 'run_validation') as mock:
+                mock.return_value = pd.Series({'id': 'run123'})
+                self.con.run_config_validation(config_path, override={'value': 2})
+                assert mock.called
+    
+    def test_run_config_validation_invalid_override(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, 'config.json')
+            with open(config_path, 'w') as f:
+                f.write('[{"name": "test"}]')
+            
+            with pytest.raises(KeyError, match="badkey"):
+                self.con.run_config_validation(config_path, override={'badkey': 2})
 
 
 class TestValidationMonitoring(unittest.TestCase):
@@ -287,6 +329,43 @@ class TestErrorCases(unittest.TestCase):
         """Test ValidationRunNotFoundError is raised for invalid run ID"""
         with self.assertRaises(ValidationRunNotFoundError):
             self.con.validation_time(self.run_id)
+
+    def test_validation_run_not_found_error(self):
+        error = ValidationRunNotFoundError("run123")
+        assert "run123" in str(error)
+
+    def test_validation_instance_error(self):
+        error = ValidationInstanceError("msg")
+        assert "msg" in str(error)
+
+
+class TestGlobalsDotrc(unittest.TestCase):
+    """Test _write_dotrc and _load_dotrc"""
+
+    def test_write_dotrc(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, '.qa4smapirc')
+            _write_dotrc({"qa4sm.eu": {"token": "t1"}}, path)
+            with open(path) as f:
+                content = f.read()
+            assert "qa4sm.eu" in content
+            assert "t1" in content
+
+    def test_load_dotrc_file_not_found(self):
+        with pytest.raises(FileNotFoundError, match="credentials file not found"):
+            _load_dotrc("/nonexistent/.qa4smapirc")
+
+
+class TestAccessEnv(unittest.TestCase):
+    """Test Access.from_env"""
+
+    def test_from_env_success(self):
+        with patch.dict(os.environ, {
+            "QA4SM_INSTANCE": "test.qa4sm.eu",
+            "QA4SM_TOKEN": "test_token"
+        }):
+            access = Access.from_env()
+            assert access.access["test.qa4sm.eu"] == "test_token"
 
 
 def test_unknown_instance():
