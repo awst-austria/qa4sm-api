@@ -65,13 +65,13 @@ jobs:
     name: Submit Coveralls 👚
     needs: build
     runs-on: ubuntu-latest
-    container: python:3-slim
     steps:
-      - name: Finished
-        run: |
-          pip3 install --upgrade coveralls && coveralls --service=github --finish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Finalize Coveralls Parallel Build
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+        continue-on-error: true
 
   package:
     name: Build sdist & wheel 📦
