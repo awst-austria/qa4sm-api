@@ -60,35 +60,8 @@ jobs:
           mkdir -p artifacts
           filename=env_py${{ matrix.python-version }}_${{ matrix.os }}.yml
           conda env export --no-builds | grep -v "prefix" > artifacts/$filename
-      - name: Create wheel and dist package
-        shell: bash -l {0}
-        run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]
-          then
-            # build wheel on windows
-            python -m build --wheel --outdir artifacts/dist
-          else
-            # build both wheel and sdist on linux/mac
-            python -m build --wheel --sdist --outdir artifacts/dist
-          fi
-          ls artifacts/dist
-          twine check artifacts/dist/* || true
-      - name: Upload Coverage
-        shell: bash -l {0}
-        continue-on-error: true
-        run: |
-          pip install coveralls && coveralls --service=github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
-          COVERALLS_PARALLEL: true
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: Artifacts-py${{ matrix.python-version }}-${{ matrix.os }}
-          path: artifacts/*
 
-  publish-coverage:
+  coveralls:
     name: Submit Coveralls 👚
     needs: build
     runs-on: ubuntu-latest
@@ -100,31 +73,53 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish-pypi-package:
-    name: Publish PyPI 🚀
-    # Trigger on release tags from the awst-austria repository
-    if: |
-      startsWith(github.ref, 'refs/tags/v') &&
-      startsWith(github.repository, 'awst-austria')
+  package:
+    name: Build sdist & wheel 📦
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+          fetch-depth: 0  # needed for setuptools_scm to determine version
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build sdist and wheel
+        run: |
+          pip install build twine
+          python -m build
+          ls -la dist/
+          twine check dist/*
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Upload to PyPI 🚀
+    if: startsWith(github.ref, 'refs/tags/v') && startsWith(github.repository, 'awst-austria')
+    needs: package
     runs-on: ubuntu-latest
     steps:
       - name: Print environment variables
         run: |
           echo "GITHUB_REF = $GITHUB_REF"
           echo "GITHUB_REPOSITORY = $GITHUB_REPOSITORY"
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v6
         with:
-          path: dist
-          merge-multiple: true
+          name: dist
+          path: dist/
       - name: Display downloaded files
-        run: ls -la dist/
+        run: ls -aR dist/
       - name: Upload to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.13.0
         with:
           skip_existing: true
           verbose: true
           verify_metadata: true
           packages_dir: dist/
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }} # this needs to be uploaded to github actions secrets
