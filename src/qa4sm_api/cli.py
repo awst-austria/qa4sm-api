@@ -218,9 +218,3 @@ def cli_download_results(run_id: str, out_path: str, instance: str) -> None:
     out_path = out_path or os.getcwd()
     qa4sm = Connection(instance, token='file')
     qa4sm.download_results(run_id, out_path, force_download=True)
-
-
-
-
-if __name__ == "__main__":
-    setup_api()

@@ -18,6 +18,9 @@ else:
 DEFAULT_INSTANCE = "qa4sm.eu"
 KNOWN_INSTANCES = ["qa4sm.eu", "test.qa4sm.eu", "test2.qa4sm.eu", "0.0.0.0:8000"]
 
+class Qa4smEnvironmentError(KeyError):
+    pass
+
 class ValidationRunNotFoundError(ValueError):
 
     def __init__(self, id):
