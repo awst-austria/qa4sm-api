@@ -4,11 +4,10 @@
 
 from pathlib import Path
 import os
-import  warnings
+import warnings
 import configparser
 from datetime import datetime
 import requests
-
 
 if "QA4SM_DOTRC" in os.environ:
     QA4SM_DOTRC_PATH = Path(os.environ["QA4SM_DOTRC"])
@@ -16,10 +15,14 @@ else:
     QA4SM_DOTRC_PATH = Path.home() / ".qa4smapirc"
 
 DEFAULT_INSTANCE = "qa4sm.eu"
-KNOWN_INSTANCES = ["qa4sm.eu", "test.qa4sm.eu", "test2.qa4sm.eu", "0.0.0.0:8000"]
+KNOWN_INSTANCES = [
+    "qa4sm.eu", "test.qa4sm.eu", "test2.qa4sm.eu", "0.0.0.0:8000"
+]
+
 
 class Qa4smEnvironmentError(KeyError):
     pass
+
 
 class ValidationRunNotFoundError(ValueError):
 
@@ -45,10 +48,12 @@ class ValidationInstanceError(KeyError):
 
 class AuthenticationError(ValueError):
 
-    def __init__(self, message="No API token is available for this user. "
-                               "Please generate one."):
+    def __init__(self,
+                 message="No API token is available for this user. "
+                 "Please generate one."):
         self.message = message
         super().__init__(self.message)
+
 
 def _write_dotrc(config: dict, path=QA4SM_DOTRC_PATH):
     """
@@ -96,10 +101,8 @@ def _load_dotrc(path=QA4SM_DOTRC_PATH):
     """
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(
-            f'QA4SM credentials file not found at {path}. '
-            f'Please check https://qa4sm.eu/ui/public-api'
-        )
+        raise FileNotFoundError(f'QA4SM credentials file not found at {path}. '
+                                f'Please check https://qa4sm.eu/ui/public-api')
 
     PRODUCTION_SECTIONS = {"default", "qa4sm", "qa4sm.eu"}
 
@@ -123,7 +126,9 @@ def _load_dotrc(path=QA4SM_DOTRC_PATH):
     return config
 
 
-def _connect_with_credentials(instance: str, username: str, password: str,
+def _connect_with_credentials(instance: str,
+                              username: str,
+                              password: str,
                               quiet: bool = True) -> dict:
     """
     Open a Session to the given instance, authenticate with username/password,
@@ -136,12 +141,14 @@ def _connect_with_credentials(instance: str, username: str, password: str,
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         session = Session(instance=instance, token="none", quiet_login=quiet)
-        _ = session.login_with_credentials(username=username, password=password)
+        _ = session.login_with_credentials(
+            username=username, password=password)
         access = session.access.access
     return access
 
 
-def make_dummy_ok_response(json_data: dict = None, text: str = "",
+def make_dummy_ok_response(json_data: dict = None,
+                           text: str = "",
                            status_code: int = 200) -> requests.Response:
     response = requests.models.Response()
     response.status_code = status_code

@@ -14,21 +14,14 @@ from pathlib import Path
 from datetime import datetime
 import pprint as pprint
 
-
-
-
-from qa4sm_api.globals import (
-    QA4SM_DOTRC_PATH,
-    ValidationRunNotFoundError,
-    AuthenticationError,
-    ValidationInstanceError,
-    _load_dotrc,
-    make_dummy_ok_response,
-    Qa4smEnvironmentError
-)
+from qa4sm_api.globals import (QA4SM_DOTRC_PATH, ValidationRunNotFoundError,
+                               AuthenticationError, ValidationInstanceError,
+                               _load_dotrc, make_dummy_ok_response,
+                               Qa4smEnvironmentError)
 
 
 class Response:
+
     def __init__(self, response, serialize=True):
         self.response = response
         if serialize:
@@ -58,6 +51,7 @@ class Response:
 
 
 class Access:
+
     def __init__(self, access):
         """
         Initialize the Access class with credentials to the API.
@@ -157,10 +151,13 @@ class Session:
     """
     Wrapper to send API request to QA4SM after authentication.
     """
-    _max_retries = 10       # for all requests
-    _wait_retry_s = 0.1     # seconds between requests
+    _max_retries = 10  # for all requests
+    _wait_retry_s = 0.1  # seconds between requests
 
-    def __init__(self, instance="qa4sm.eu", token="auto", protocol="https",
+    def __init__(self,
+                 instance="qa4sm.eu",
+                 token="auto",
+                 protocol="https",
                  quiet_login=True):
         """
         Session to send requests to QA4SM via API.
@@ -184,9 +181,7 @@ class Session:
         quiet_login: bool, optional
             Don't print welcome message on login.
         """
-        self.headers = {
-            "Content-Type": "application/json"
-        }
+        self.headers = {"Content-Type": "application/json"}
         self.instance = instance
         self.base_url = f"{protocol}://{self.instance}/"
         self.api_url = self.base_url + "api/"
@@ -213,8 +208,9 @@ class Session:
 
         self.user = "ANONYMOUS"
         if instance not in list(self.access.access.keys()):
-            raise ValidationInstanceError(f"Unknown instance {instance}. "
-                                          f"Please add it to your .qa4smapirc file.")
+            raise ValidationInstanceError(
+                f"Unknown instance {instance}. "
+                f"Please add it to your .qa4smapirc file.")
         else:
             token = self.access[instance]['token']
         if token is not None:
@@ -230,8 +226,6 @@ class Session:
         # Join URL parts
         args = [str(a) for a in args]
         url = '/'.join(args).replace('//', '/')
-        # if url.endswith('/'):
-        #     url = url[:-1]
 
         return self.api_url + url
 
@@ -247,8 +241,11 @@ class Session:
             print(f"Hi, {username}! You're successfully logged "
                   f"in at {self.api_url}!")
         self.user = username
-        self.access = Access({self.instance:
-                                  {'token': token, 'username': self.user}})
+        self.access = Access(
+            {self.instance: {
+                'token': token,
+                'username': self.user
+            }})
         return 200
 
     def login_with_credentials(self, username=None, password=None):
@@ -284,13 +281,11 @@ class Session:
             raise AuthenticationError(
                 f"User does not have a "
                 f"token yet. Please request one first at "
-                f"https://qa4sm.eu/ui/user-profile."
-            )
+                f"https://qa4sm.eu/ui/user-profile.")
         self.login_with_token(token)
         return token
 
-    def delete(self, url, serialize=True, dry_run=False,
-               **kwargs):
+    def delete(self, url, serialize=True, dry_run=False, **kwargs):
         """
         Send a DELETE request to the API. Retry on fail.
 
@@ -318,8 +313,8 @@ class Session:
                 if dry_run:
                     response = make_dummy_ok_response()
                 else:
-                    response = requests.delete(url, headers=self.headers,
-                                               timeout=10, **kwargs)
+                    response = requests.delete(
+                        url, headers=self.headers, timeout=10, **kwargs)
 
                 response.raise_for_status()
                 response = Response(response, serialize=serialize)
@@ -330,8 +325,7 @@ class Session:
                     raise e
                 time.sleep(self._wait_retry_s)
 
-    def post(self, url, data, serialize=True,
-             **kwargs) -> Response:
+    def post(self, url, data, serialize=True, **kwargs) -> Response:
         """
         Send a POST request to the API.
 
@@ -356,8 +350,8 @@ class Session:
 
         for attempt in range(self._max_retries):
             try:
-                response = requests.post(url, headers=self.headers,
-                                         json=data, timeout=10, **kwargs)
+                response = requests.post(
+                    url, headers=self.headers, json=data, timeout=10, **kwargs)
                 response.raise_for_status()
                 response = Response(response, serialize=serialize)
                 self.response = response
@@ -366,7 +360,6 @@ class Session:
                 if attempt == self._max_retries - 1:  # Last attempt
                     raise e
                 time.sleep(self._wait_retry_s)
-
 
     def get(self, url, serialize=True, **kwargs) -> Response:
         """
@@ -401,8 +394,8 @@ class Session:
                 time.sleep(self._wait_retry_s)
 
 
-
 class ValidationConfiguration:
+
     def __init__(self, config_data: dict):
         self.data = config_data[0] if len(config_data) == 1 else config_data
 
@@ -478,8 +471,12 @@ class Connection:
     """
     Communication with QA4SM.
     """
-    def __init__(self, instance: str="qa4sm.eu", token="auto",
-                 protocol="https", quiet_login=True):
+
+    def __init__(self,
+                 instance: str = "qa4sm.eu",
+                 token="auto",
+                 protocol="https",
+                 quiet_login=True):
         """
         Parameters
         ----------
@@ -505,7 +502,6 @@ class Connection:
         """
         self.session = Session(instance, token, protocol, quiet_login)
 
-
     def __repr__(self):
         s = f"{type(self).__module__}.{type(self).__qualname__}"
         return f"{s}(session={self.session})"
@@ -520,8 +516,8 @@ class Connection:
         self.session.login_with_credentials(username, password)
 
     def user(self) -> pd.Series:
-        re = self.session.get(self.url("auth/login"),
-                              headers=self.session.headers)
+        re = self.session.get(
+            self.url("auth/login"), headers=self.session.headers)
         return re.pandas
 
     def _find(self, df, val):
@@ -645,7 +641,8 @@ class Connection:
         ser['id'] = ds_id
         return ser
 
-    def version_info(self, version: Union[str, int],
+    def version_info(self,
+                     version: Union[str, int],
                      dataset: Optional[Union[str, int]] = None) -> pd.Series:
         """
         Get version metadata
@@ -774,8 +771,8 @@ class Connection:
             raise ValidationRunNotFoundError(validation_id)
         else:
             url = self.url(f"validation-runs-timing/{validation_id}")
-            response = self.session.get(url,
-                                        headers=self.session.headers).data[0]
+            response = self.session.get(
+                url, headers=self.session.headers).data[0]
 
             duration_seconds = response["duration_seconds"]
             duration_format = response["duration_format"]
@@ -874,8 +871,7 @@ class Connection:
             Response from server. Dummy OK response for dry_run=True.
         """
         url = self.url(f"delete-validation/{run_id}/")
-        response = self.session.delete(url, serialize=False,
-                                       dry_run=dry_run)
+        response = self.session.delete(url, serialize=False, dry_run=dry_run)
         return response
 
     def download_results(self, run_id, out_dir, force_download=False):
@@ -904,8 +900,11 @@ class Connection:
 
         graphx_dir = os.path.join(out_dir, "qa4sm_graphics")
         if force_download or (not os.path.exists(graphx_dir)):
-            re = self.session.get(self.url("download-result"), serialize=False,
-                                  params=params, stream=True)
+            re = self.session.get(
+                self.url("download-result"),
+                serialize=False,
+                params=params,
+                stream=True)
             file_out = os.path.join(out_dir, "graphics.zip")
             with open(file_out, "wb") as file:
                 for chunk in re.response.iter_content(chunk_size=8192):
@@ -919,8 +918,11 @@ class Connection:
         params["fileType"] = "netCDF"
         file_out = os.path.join(out_dir, f"{run_id}.nc")
         if force_download or (not os.path.exists(file_out)):
-            re = self.session.get(self.url("download-result"), serialize=False,
-                                  params=params, stream=True)
+            re = self.session.get(
+                self.url("download-result"),
+                serialize=False,
+                params=params,
+                stream=True)
             with open(file_out, "wb") as file:
                 for chunk in re.response.iter_content(chunk_size=8192):
                     file.write(chunk)
@@ -928,8 +930,11 @@ class Connection:
         _ = params.pop("fileType")
         file_out = os.path.join(out_dir, f"summary_stats.csv")
         if force_download or (not os.path.exists(file_out)):
-            re = self.session.get(self.url("download-statistics-csv"), serialize=False,
-                                  params=params, stream=True)
+            re = self.session.get(
+                self.url("download-statistics-csv"),
+                serialize=False,
+                params=params,
+                stream=True)
             with open(file_out, "wb") as file:
                 for chunk in re.response.iter_content(chunk_size=8192):
                     file.write(chunk)
@@ -962,5 +967,3 @@ class Connection:
         response = self.run_validation(config)
 
         return response
-
-
