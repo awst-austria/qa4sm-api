@@ -4,7 +4,7 @@ Changelog
 
 Unreleased
 ==========
-- Code styling with yapf
+- Code styling with yapf; meta-package updated
 
 Version 0.2
 ===========

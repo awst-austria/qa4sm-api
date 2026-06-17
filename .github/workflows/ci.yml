@@ -47,6 +47,12 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install build -e .[testing]
+      - name: Export Environment
+        shell: bash -l {0}
+        run: |
+          mkdir -p artifacts
+          filename=env_py${{ matrix.python-version }}_${{ matrix.os }}.yml
+          conda env export --no-builds | grep -v "prefix" > artifacts/$filename
       - name: Run all tests
         shell: bash -l {0}
         env:  # so some of the optional tests can log in to test.qa4sm.eu
@@ -54,12 +60,14 @@ jobs:
           QA4SM_TOKEN: ${{ secrets.QA4SM_TOKEN }}
         run: |
           pytest
-      - name: Export Environment
+      - name: Upload Coverage
         shell: bash -l {0}
         run: |
-          mkdir -p artifacts
-          filename=env_py${{ matrix.python-version }}_${{ matrix.os }}.yml
-          conda env export --no-builds | grep -v "prefix" > artifacts/$filename
+          pip install coveralls && coveralls --service=github-actions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
+          COVERALLS_PARALLEL: true
 
   coveralls:
     name: Submit Coveralls 👚
