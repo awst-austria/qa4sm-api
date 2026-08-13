@@ -3,9 +3,9 @@
 .. image:: https://img.shields.io/badge/CI-GitHub%20Actions-success?logo=github-actions
    :alt: GitHub Actions
    :target: https://github.com/awst-austria/qa4sm-api/actions
-.. image:: https://img.shields.io/coveralls/github/awst-austria/qa4sm-api/main?logo=coveralls
+.. image:: https://coveralls.io/repos/github/awst-austria/qa4sm-api/badge.svg?branch=main
    :alt: Coveralls
-   :target: https://coveralls.io/github/awst-austria/qa4sm-api
+   :target: https://coveralls.io/github/awst-austria/qa4sm-api?branch=main
 .. image:: https://img.shields.io/pypi/v/qa4sm-api
    :alt: PyPI
    :target: https://pypi.org/project/qa4sm-api/
