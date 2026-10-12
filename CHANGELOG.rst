@@ -5,6 +5,7 @@ Changelog
 Unreleased
 ==========
 - Code styling with yapf; meta-package updated
+- Added a CLI to list validation runs (`PR #5 <https://github.com/awst-austria/qa4sm-api/pull/5>`_)
 
 Version 0.2
 ===========
