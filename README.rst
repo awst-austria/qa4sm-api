@@ -1,6 +1,6 @@
 .. coding: utf-8
 
-.. image:: https://img.shields.io/badge/CI-GitHub%20Actions-success?logo=github-actions
+.. image:: https://github.com/awst-austria/qa4sm-api/actions/workflows/ci.yml/badge.svg?branch=main
    :alt: GitHub Actions
    :target: https://github.com/awst-austria/qa4sm-api/actions
 .. image:: https://coveralls.io/repos/github/awst-austria/qa4sm-api/badge.svg?branch=main
