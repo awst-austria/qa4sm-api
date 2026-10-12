@@ -45,6 +45,14 @@ def download():
     pass
 
 
+@cli.group("list", short_help="LIST COMMANDS, see `qa4sm list --help`.")
+def list_():
+    """
+    List information from QA4SM.
+    """
+    pass
+
+
 def setup_api(instance=DEFAULT_INSTANCE):
     """
     Login to instance via username and password. Retrieve API token and store
@@ -112,6 +120,35 @@ def cli_check(instance: str) -> None:
     else:
         click.echo("Failed! Please make sure you have configured your "
                    ".qa4smapirc file correctly.")
+
+@list_.command(
+    "runs",
+    short_help="List your validation runs."
+)
+@instance_option
+def cli_runs(instance: str) -> None:
+    """
+    List all validation runs of the user whose token is stored for the
+    chosen instance.
+    """
+    qa4sm = Connection(instance, token='file')
+    runs = qa4sm.my_validation_runs()
+
+    if runs.empty:
+        click.echo(f"No validation runs found on {instance}.")
+        return
+
+    runs['datasets'] = runs['datasets'].str.join("; ")
+    runs['progress'] = runs['progress'].astype(str) + "%"
+    runs = runs.reset_index()
+    # Left-align all columns, similar to `column -t`
+    widths = {col: max(len(col), runs[col].astype(str).str.len().max())
+              for col in runs.columns}
+    click.echo("  ".join(col.ljust(widths[col]) for col in runs.columns))
+    for _, row in runs.iterrows():
+        click.echo("  ".join(
+            str(row[col]).ljust(widths[col]) for col in runs.columns))
+
 
 @cli.command(
     "validate",
