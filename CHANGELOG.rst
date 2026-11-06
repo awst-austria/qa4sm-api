@@ -2,10 +2,15 @@
 Changelog
 =========
 
-Unreleased
-==========
+Version X.X.X
+=============
+-
+
+Version 0.2.1
+=============
 - Code styling with yapf; meta-package updated
 - Added a CLI to list validation runs (`PR #5 <https://github.com/awst-austria/qa4sm-api/pull/5>`_)
+- A bug was fixed that led to an error when using the "qa4sm validate" CLI command.
 
 Version 0.2
 ===========

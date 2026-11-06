@@ -156,10 +156,10 @@ def cli_runs(instance: str) -> None:
 )
 @click.argument(
     "CONFIG_FILE",
-    type=click.File("r"),
+    type=click.STRING,
 )
 @instance_option
-def cli_validate(conf: str, instance: str) -> None:
+def cli_validate(config_file: str, instance: str) -> None:
     """
     Start a validation run on QA4SM using the settings from the passed
     configuration.
@@ -170,9 +170,12 @@ def cli_validate(conf: str, instance: str) -> None:
       `qa4sm download config` command to download a template from an existing
       run.
     """
+    if not os.path.isfile(config_file):
+        raise ValueError("Configuration file {} does not exist."
+                         .format(config_file))
     # The above docstring is written to be displayed when calling --help
     qa4sm = Connection(instance, token='file')
-    response = qa4sm.run_config_validation(conf, override=None)
+    response = qa4sm.run_config_validation(config_file, override=None)
 
     if not response.empty:
         run_id = response.name
