@@ -18,6 +18,10 @@ jobs:
     name: py${{ matrix.python-version }}@${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      # Limit concurrent jobs: all jobs run tests against the same QA4SM
+      # test instance, too many parallel connections can get the runners
+      # temporarily blocked (ConnectTimeout).
+      max-parallel: 2
       matrix:
         python-version: ['3.8', '3.13']
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
