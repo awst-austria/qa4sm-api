@@ -5,7 +5,8 @@
 import json
 import warnings
 import requests
-import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pandas as pd
 from typing import Union, Optional, List
 import os
@@ -151,8 +152,16 @@ class Session:
     """
     Wrapper to send API request to QA4SM after authentication.
     """
-    _max_retries = 10  # for all requests
-    _wait_retry_s = 0.1  # seconds between requests
+    # Retry policy for all requests. Connection errors are retried with
+    # exponential backoff (1, 2, 4, 8, ... s) so that a temporarily
+    # unreachable or rate-limiting server is not hammered with requests.
+    # Read errors and status-code retries only apply to idempotent methods
+    # (urllib3 default), so a POST that reached the server is never re-sent.
+    _max_retries = 5
+    _backoff_factor = 1.0
+    _retry_status = (429, 500, 502, 503, 504)
+    # (connect, read) timeout in seconds
+    _timeout = (10, 60)
 
     def __init__(self,
                  instance="qa4sm.eu",
@@ -187,7 +196,7 @@ class Session:
         self.api_url = self.base_url + "api/"
         self.quiet_login = quiet_login
 
-        self.client = requests.Session()
+        self.client = self._make_client()
         self.response = None
 
         if token == "auto":
@@ -221,6 +230,43 @@ class Session:
 
     def __repr__(self):
         return f"{self.user}@{self.instance}"
+
+    @classmethod
+    def _make_client(cls) -> requests.Session:
+        """
+        HTTP client that reuses connections and retries transient errors.
+        """
+        retry = Retry(
+            total=cls._max_retries,
+            connect=cls._max_retries,
+            read=cls._max_retries,
+            status=cls._max_retries,
+            backoff_factor=cls._backoff_factor,
+            status_forcelist=cls._retry_status,
+            respect_retry_after_header=True,
+            raise_on_status=False,  # return last response -> HTTPError below
+        )
+        client = requests.Session()
+        adapter = HTTPAdapter(max_retries=retry)
+        client.mount("https://", adapter)
+        client.mount("http://", adapter)
+        return client
+
+    def close(self):
+        """ Close all pooled connections. """
+        self.client.close()
+
+    def _request(self, method, url, serialize=True, **kwargs) -> Response:
+        kwargs.setdefault("timeout", self._timeout)
+        response = self.client.request(method, url, **kwargs)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError:
+            response.close()
+            raise
+        response = Response(response, serialize=serialize)
+        self.response = response
+        return response
 
     def url(self, *args) -> str:
         # Join URL parts
@@ -287,7 +333,7 @@ class Session:
 
     def delete(self, url, serialize=True, dry_run=False, **kwargs):
         """
-        Send a DELETE request to the API. Retry on fail.
+        Send a DELETE request to the API. Transient errors are retried.
 
         Parameters
         ----------
@@ -308,22 +354,13 @@ class Session:
         if self.headers is None:
             raise ValueError("No headers found to post request.")
 
-        for attempt in range(self._max_retries):
-            try:
-                if dry_run:
-                    response = make_dummy_ok_response()
-                else:
-                    response = requests.delete(
-                        url, headers=self.headers, timeout=10, **kwargs)
+        if dry_run:
+            response = Response(make_dummy_ok_response(), serialize=serialize)
+            self.response = response
+            return response
 
-                response.raise_for_status()
-                response = Response(response, serialize=serialize)
-                self.response = response
-                return response
-            except requests.exceptions.RequestException as e:
-                if attempt == self._max_retries - 1:  # Last attempt
-                    raise e
-                time.sleep(self._wait_retry_s)
+        return self._request("DELETE", url, serialize=serialize,
+                             headers=self.headers, **kwargs)
 
     def post(self, url, data, serialize=True, **kwargs) -> Response:
         """
@@ -338,7 +375,7 @@ class Session:
         serialize: bool, optional
             Whether the response should be json serialized
         kwargs:
-            Additional kwargs are passed to requests.delete
+            Additional kwargs are passed to requests.post
 
         Returns
         -------
@@ -348,18 +385,8 @@ class Session:
         if self.headers is None:
             raise ValueError("No headers found to post request.")
 
-        for attempt in range(self._max_retries):
-            try:
-                response = requests.post(
-                    url, headers=self.headers, json=data, timeout=10, **kwargs)
-                response.raise_for_status()
-                response = Response(response, serialize=serialize)
-                self.response = response
-                return response
-            except requests.exceptions.RequestException as e:
-                if attempt == self._max_retries - 1:  # Last attempt
-                    raise e
-                time.sleep(self._wait_retry_s)
+        return self._request("POST", url, serialize=serialize,
+                             headers=self.headers, json=data, **kwargs)
 
     def get(self, url, serialize=True, **kwargs) -> Response:
         """
@@ -372,26 +399,14 @@ class Session:
         serialize: bool, optional
             Whether the response should be json serialized
         kwargs:
-            Additional kwargs are passed to requests.delete
+            Additional kwargs are passed to requests.get
 
         Returns
         -------
         Response
             Response from the API
         """
-        for attempt in range(self._max_retries):
-            try:
-                response = requests.get(url, timeout=10, **kwargs)
-                response.raise_for_status()
-                response = Response(response, serialize=serialize)
-                self.response = response
-                return response
-
-            except requests.exceptions.RequestException as e:
-                if attempt == self._max_retries - 1:  # Last attempt
-                    raise e
-
-                time.sleep(self._wait_retry_s)
+        return self._request("GET", url, serialize=serialize, **kwargs)
 
 
 class ValidationConfiguration:
@@ -892,6 +907,14 @@ class Connection:
         response = self.session.delete(url, serialize=False, dry_run=dry_run)
         return response
 
+    def _download_file(self, url, params, file_out):
+        """ Stream a file to disk and release the connection afterwards. """
+        re = self.session.get(url, serialize=False, params=params,
+                              stream=True)
+        with re.response as response, open(file_out, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
     def download_results(self, run_id, out_dir, force_download=False):
         """
         Download all results for a run
@@ -918,15 +941,8 @@ class Connection:
 
         graphx_dir = os.path.join(out_dir, "qa4sm_graphics")
         if force_download or (not os.path.exists(graphx_dir)):
-            re = self.session.get(
-                self.url("download-result"),
-                serialize=False,
-                params=params,
-                stream=True)
             file_out = os.path.join(out_dir, "graphics.zip")
-            with open(file_out, "wb") as file:
-                for chunk in re.response.iter_content(chunk_size=8192):
-                    file.write(chunk)
+            self._download_file(self.url("download-result"), params, file_out)
 
             with zipfile.ZipFile(file_out, 'r') as zip_ref:
                 zip_ref.extractall(graphx_dir)
@@ -936,26 +952,13 @@ class Connection:
         params["fileType"] = "netCDF"
         file_out = os.path.join(out_dir, f"{run_id}.nc")
         if force_download or (not os.path.exists(file_out)):
-            re = self.session.get(
-                self.url("download-result"),
-                serialize=False,
-                params=params,
-                stream=True)
-            with open(file_out, "wb") as file:
-                for chunk in re.response.iter_content(chunk_size=8192):
-                    file.write(chunk)
+            self._download_file(self.url("download-result"), params, file_out)
 
         _ = params.pop("fileType")
         file_out = os.path.join(out_dir, f"summary_stats.csv")
         if force_download or (not os.path.exists(file_out)):
-            re = self.session.get(
-                self.url("download-statistics-csv"),
-                serialize=False,
-                params=params,
-                stream=True)
-            with open(file_out, "wb") as file:
-                for chunk in re.response.iter_content(chunk_size=8192):
-                    file.write(chunk)
+            self._download_file(
+                self.url("download-statistics-csv"), params, file_out)
 
     def run_config_validation(self, config_path, override=None):
         """

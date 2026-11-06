@@ -83,8 +83,10 @@ class TestSession(unittest.TestCase):
 
 class TestValidationConfiguration(unittest.TestCase):
 
-    def setUp(self):
-        self.config = ValidationConfiguration.from_remote(
+    @classmethod
+    def setUpClass(cls):
+        # fetch once for all tests to limit requests to the server
+        cls.config = ValidationConfiguration.from_remote(
             "9aeb663b-e24e-4541-8331-6ec3e0318d1f",
             instance="qa4sm.eu", token="none")
 
@@ -180,10 +182,16 @@ class TestConnectionTestInstance(unittest.TestCase):
                     reason="No Access credentials available.")
 class TestConnectionWithToken(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
+        # log in once for all tests to limit requests to the server
         instance = "test.qa4sm.eu"
         token = QA4SM_ACCESS[instance]['token']
-        self.con = Connection(instance=instance, token=token)
+        cls.con = Connection(instance=instance, token=token)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.con.session.close()
 
     def test_url(self):
         assert (self.con.url("asd", "jkl/") ==
@@ -373,7 +381,9 @@ class TestAccessEnv(unittest.TestCase):
 
 
 def test_unknown_instance():
-    with pytest.warns(UserWarning):
+    # no backoff between retries, the host will never be reachable
+    with pytest.warns(UserWarning), \
+            patch.object(Session, '_backoff_factor', 0):
         conn = Connection("unknown_instance.com", token="none")
     with pytest.raises(requests.exceptions.ConnectionError):
         conn.datasets()
