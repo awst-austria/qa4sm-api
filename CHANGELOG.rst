@@ -2,6 +2,11 @@
 Changelog
 =========
 
+Unreleased
+==========
+- Listing datasets now also lists user datasets if a login Connection with a token is used
+-
+
 Version 0.3.0
 =============
 - Reuse HTTP connections and retry transient errors (connection errors,
