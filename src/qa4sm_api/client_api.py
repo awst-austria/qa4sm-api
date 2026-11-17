@@ -282,6 +282,7 @@ class Session:
         """
         self.headers["Authorization"] = f"Token {token}"
         re = self.get(self.url("auth/login"), headers=self.headers)
+        self.client.headers["Authorization"] = f"Token {token}"
         username = re.pandas['username']
         if not self.quiet_login:
             print(f"Hi, {username}! You're successfully logged "
@@ -600,11 +601,23 @@ class Connection:
         versions = self.versions(dataset)[['short_name', 'pretty_name']]
         return self._find(versions, version)
 
-    def datasets(self) -> pd.DataFrame:
+    def datasets(self, exclude_no_files: bool = True) -> pd.DataFrame:
         """
         Get a list of available datasets.
+        When logged in, this includes the user's own datasets and
+        datasets shared with the user, otherwise only public datasets.
+
+        Parameters
+        ----------
+        exclude_no_files: bool, optional (default: True)
+            Skip user datasets for which no data file was uploaded yet.
         """
-        r = self.session.get(self.url("dataset"))
+        logged_in = "Authorization" in self.session.client.headers
+        params = {
+            "userData": "true" if logged_in else "false",
+            "excludeNoFiles": "true" if exclude_no_files else "false",
+        }
+        r = self.session.get(self.url("dataset"), params=params)
         df = r.pandas
         return df
 
