@@ -32,10 +32,7 @@ Features
 - **Result Download**: Download NetCDF, graphics, and summary statistics
 - **Search datasets in the service**, **download validation configurations**, ...
 - **Programmatically trigger validation runs**
-
-Coming soon:
-
-- Programmatically upload your data for validation
+- **Programmatically upload your data for validation**
 
 Installation
 ============

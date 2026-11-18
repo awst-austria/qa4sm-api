@@ -1001,3 +1001,55 @@ class Connection:
         response = self.run_validation(config)
 
         return response
+
+    def upload_user_data(self, file_path, dataset_name: str, version_name: str, 
+                         dataset_pretty_name=None, **extra_metadata):
+        """
+        Upload a data file to QA4SM.
+
+        Parameters
+        ----------
+        file_path: str or Path
+            Local file to upload.
+        dataset_name: str
+            Short internal name of the dataset.
+        version_name: str
+            Version label, e.g. "v1".
+        dataset_pretty_name: str
+            Optional display name of the dataset. If not passed, dataset_name
+            is taken.
+        **extra_metadata:
+            Further metadata fields that are added to the request.
+
+        Returns
+        -------
+        Response
+            Response from the API.
+        """
+        file_path = Path(file_path)
+        if not file_path.is_file():
+            raise FileNotFoundError(f"No such file: {file_path}")
+
+        metadata = {
+            "dataset_name": dataset_name,
+            "dataset_pretty_name": dataset_pretty_name 
+                                    if dataset_pretty_name != None
+                                    else dataset_name,
+            "version_name": version_name,
+            **extra_metadata,
+        }
+
+        # keep the Authorization header, but drop the JSON content type
+        # so that requests can set the multipart boundary itself
+        headers = {k: v for k, v in self.session.headers.items()
+                   if k.lower() != "content-type"}
+
+        url = f"{self.session.api_url}upload-user-data-with-token/{file_path.name}"
+
+        # send the request
+        with open(file_path, "rb") as f:
+            response = self.session._request(
+                        "POST", url, serialize=False, headers=headers,
+                        files={"file": (file_path.name, f)},
+                        data={"metadata": json.dumps(metadata)},)
+            return response
