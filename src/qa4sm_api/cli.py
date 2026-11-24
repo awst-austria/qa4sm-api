@@ -53,6 +53,14 @@ def list_():
     pass
 
 
+@cli.group(short_help="UPLOAD DATA, see 'qa4sm upload --help'.")
+def upload():
+    """
+    Upload data to QA4SM.
+    """
+    pass
+
+
 def setup_api(instance=DEFAULT_INSTANCE):
     """
     Login to instance via username and password. Retrieve API token and store
@@ -258,3 +266,63 @@ def cli_download_results(run_id: str, out_path: str, instance: str) -> None:
     out_path = out_path or os.getcwd()
     qa4sm = Connection(instance, token='file')
     qa4sm.download_results(run_id, out_path, force_download=True)
+
+
+@upload.command(
+    "dataset",
+    short_help="Upload a user dataset."
+)
+@click.argument(
+    "FILE_PATH",
+    type=click.Path(exists=True,
+    dir_okay=False)
+)
+@click.option(
+    "--short_name",
+    required=True,
+    help="Short internal name of the dataset."
+)
+@click.option(
+    "--version",
+    "version_name",
+    required=True,
+    help='Version label, e.g. "v1.0".'
+)
+@click.option(
+    "--pretty_name",
+    default=None,
+    help="Display name (defaults to --short_name)."
+)
+@click.option(
+    "--meta",
+    multiple=True,
+    metavar="KEY=VALUE",
+    help="Additional metadata, can be repeated."
+)
+@instance_option
+def cli_upload_dataset(file_path, short_name, version_name, pretty_name,
+                       meta, instance):
+    """
+    Upload a data file to QA4SM.
+
+    \b
+    Arguments:
+      FILE_PATH  Path to the data file (zip with CSV data or NetCDF file) to upload.
+    """
+    extra = {}
+    for item in meta:
+        if "=" not in item:
+            raise click.BadParameter(
+                f"'{item}' is not KEY=VALUE", param_hint="--meta")
+        key, value = item.split("=", 1)
+        extra[key] = value
+
+    qa4sm = Connection(instance, token='file')
+    resp = qa4sm.upload_user_data(
+        file_path, dataset_name=short_name, version_name=version_name,
+        dataset_pretty_name=pretty_name, **extra)
+
+    if resp.response.ok:
+        click.echo(f"Uploaded {file_path} as {short_name} {version_name}.")
+    else:
+        raise click.ClickException(f"Upload failed: {response.text}")
