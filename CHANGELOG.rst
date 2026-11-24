@@ -5,7 +5,9 @@ Changelog
 Unreleased
 ==========
 - Listing datasets now also lists user datasets if a login Connection with a token is used
--
+- User data can now be uploaded via the API function "upload_user_data()"
+  or via the command line command "qa4sm upload dataset"
+  (currently only available on the test instance)
 
 Version 0.3.0
 =============
